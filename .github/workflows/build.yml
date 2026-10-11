@@ -125,7 +125,7 @@ jobs:
           # 加上 retention-days: 1，单个 artifact 从 ~270MB 降到 ~182MB，且只活 1 天。
           path: |
             artifacts/*.zip
-            artifacts/package-extras/*.txt
+            artifacts/package-extras/*
           if-no-files-found: error
           # ⚠ 这个 artifact 只是 build → release/publish-build 两个 job 之间的**传递媒介**
           # （单个约 270MB：三个 zip + 自包含 exe），耐久副本在 Release 资产里。
