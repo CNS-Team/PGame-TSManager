@@ -57,9 +57,9 @@ jobs:
             'X-GitHub-Api-Version'   = "2022-11-28"
             'User-Agent'             = "pigeon-prune"
           }
-          $aDays = [int]("${{ github.event.inputs.artifact_days || '1' }}")
-          $cDays = [int]("${{ github.event.inputs.cache_days || '1' }}")
-          $keep  = [int]("${{ github.event.inputs.release_keep || '2' }}")
+          $aDays = [int]("${{ github.event.inputs.artifact_days || '0' }}")
+          $cDays = [int]("${{ github.event.inputs.cache_days || '0' }}")
+          $keep  = [int]("${{ github.event.inputs.release_keep || '0' }}")
           $rDays = [int]("${{ github.event.inputs.run_days || '0' }}")
           $dry   = ("${{ github.event.inputs.dry_run || 'false' }}").ToLower() -eq 'true'
           $now   = [DateTime]::UtcNow
