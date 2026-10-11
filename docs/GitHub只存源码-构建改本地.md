@@ -59,3 +59,21 @@ powershell -ExecutionPolicy Bypass -File .\scripts\Build-Local.ps1 `
 ① 手工建一个 Release 挂最新包（prune 默认会删，需要把 `release_keep` 临时改回 1+）；
 ② 放到别处（网盘/站点）；
 ③ 继续维持"只在本地构建、不公开发布"。
+
+## ⚠ 附：Actions 计费拦截的边界（2026-10-11 实测更正）
+
+11-Bot 侧的诊断是「**全账号** Actions 被 Billing 拦住，所有 run 3-4 秒失败」。TSM 侧实测**只对私有仓库成立**：
+
+| 仓库 | 可见性 | 当日 run 结果 |
+|---|---|---|
+| `PGame-TSManager`（本仓库） | **public** | `Prune #1` **54s success**、`#2` **10s success**、`#3` **15s success**；`Build #128/#129/#130/#132` 全 success（120~125s） |
+| `PGame-TSManager-Personal` | private | 验证不到（匿名不可读）；按 11-Bot 实测 = 被 billing 拦（3-4 秒失败） |
+| `PGameAPI` / `PigeonRPG` 等 | private | 被拦（11-Bot 实测） |
+
+⇒ 结论：
+
+1. **公开仓库的 Actions 不受该 billing 拦截影响**（本仓库已无构建，但 `prune.yml` 的每日/自举清理**仍然可用**）；
+2. 旁证：本仓库在 public 状态下曾堆到 **23.5GB artifacts** 也没触发计费拦截 —— 拦截来自**私有**仓库那 500MB 私有存储；
+3. 因此"**把私有仓库转 public**"是一条与"付款 / 调整 spending limit"并列的**真实可行的止血手段**（公开库 Actions 免费）；
+4. 私有库（`-Personal` / `PGameAPI` / `PigeonRPG`）在用户处理完 Billing 前，**任何 run 都不会启动**；
+   这段期间要个人版产物，直接用本地 `scripts\Build-Local.ps1`（23 秒、0 成本、不经过 GitHub Actions）。
