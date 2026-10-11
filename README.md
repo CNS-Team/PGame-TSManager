@@ -5,24 +5,24 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Pigeon-X/PGame-TSManager/actions/workflows/build.yml">
-    <img src="https://github.com/Pigeon-X/PGame-TSManager/actions/workflows/build.yml/badge.svg" alt="Build status">
-  </a>
-  <a href="https://github.com/Pigeon-X/PGame-TSManager/releases">
-    <img src="https://img.shields.io/github/v/release/Pigeon-X/PGame-TSManager?include_prereleases&label=build&color=2f81f7" alt="Build release">
-  </a>
+  <img src="https://img.shields.io/badge/build-local%20only-8A2BE2" alt="Local build only">
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D4" alt="Windows 10/11">
   <img src="https://img.shields.io/badge/TShock-6.2.x-4B8BBE" alt="TShock 6.2.x">
   <img src="https://img.shields.io/badge/.NET-9.0-512BD4" alt=".NET 9">
 </p>
 
 <p align="center">
-  <a href="https://github.com/Pigeon-X/PGame-TSManager/releases">下载构建</a>
-  ·
-  <a href="https://github.com/Pigeon-X/PGame-TSManager/actions">构建记录</a>
+  <a href="#构建">本地构建说明</a>
   ·
   <a href="https://github.com/Pigeon-X/PGame-TSManager/issues">问题反馈</a>
 </p>
+
+> [!IMPORTANT]
+> **本仓库只保存源码，不在 GitHub 上构建。**
+> 自 2026-10-11 起所有 GitHub Actions 构建流水线已移除：仓库仅作为**上游最新代码的存放处**，
+> 构建产物（Artifacts / Release 资产）一并清空，以后也不会再产生。
+> 需要可运行的包请在本地按下面「[构建](#构建)」一节自行打（一条命令），或使用维护方在本地构建后分发的包。
+> 历史工件的清理规则见 `.github/workflows/prune.yml`（每日自动删净构建产物）。
 
 > [!NOTE]
 > 本仓库维护的是**通用版**：管理器、维护工具和两套 TShock 服务器模板。
@@ -44,7 +44,7 @@
 - SQLite 默认数据库配置
 - REST API 默认配置
 - 默认必需插件：`TShockAPI.dll`、`HotReload.dll`
-- GitHub 构建时自动下载官方 TShock Windows x64 运行时并注入 `Core`
+- 打包脚本会下载官方 TShock Windows x64 运行时并注入 `Core`（**本地构建**时执行，GitHub 上不再构建）
 - 公共占位令牌，不包含私人令牌、MySQL 密码或玩家数据
 
 通用包不包含世界文件。使用者只需要把世界文件放入 `Servers\Worlds`。
@@ -58,7 +58,7 @@ PGame-TSManager 用一个窗口管理多个 TShock 服务端。它负责：
 - 插件总库与每服插件清单同步
 - TShock config、SSC、初始物品可视化编辑
 - 启动前备份、回滚中心、看门狗和异常告警
-- 自检、维护工具和 GitHub Actions 自动构建
+- 自检、维护工具，以及一键本地打包脚本（`maintenance\tools\Build-Local.ps1`；流水线已迁出 GitHub）
 
 它不替代 TShock 本身，也不会把世界、数据库、日志或玩家数据提交到 Git。
 
@@ -104,7 +104,8 @@ PGame-TSManager/
 
 ## 快速开始
 
-1. 从 [Releases](https://github.com/Pigeon-X/PGame-TSManager/releases) 下载通用包。
+1. 取一个通用包 —— 两种来源：① 本地构建（见「[构建](#构建)」，一条命令产出 `artifacts\PGame-TSManager-universal.zip`）；
+   ② 维护方本地构建后分发的包。**本仓库不再提供 Releases 下载。**
 2. 解压到目标目录。
 3. 通用包已经准备好 `Core` TShock 运行时，不需要手动复制：
 
@@ -214,7 +215,22 @@ PGame-TSManager.exe --selfcheck
 
 ## 构建
 
-源码构建需要 .NET 9 SDK：
+> **一条命令**（推荐）：需要 .NET 9 SDK 与 PowerShell 7，在仓库根目录执行：
+
+```powershell
+./maintenance/tools/Build-Local.ps1
+```
+
+它会依次完成：`dotnet publish` 自包含单文件 → 下载官方 TShock 运行时注入 `Core` → 生成三套包
+（`universal` / `template` / `source`）→ 把使用说明与更新说明塞进 zip → 跑一次仓库布局自检。
+产物在 `artifacts\` 下；常用参数：
+
+```powershell
+./maintenance/tools/Build-Local.ps1 -SkipTShockRuntime      # 已有 Core 运行时，跳过下载
+./maintenance/tools/Build-Local.ps1 -OutputRoot D:\out      # 换输出目录
+```
+
+手工分步（与脚本等价）：
 
 ```powershell
 dotnet build PGame-TSManager.sln -c Release
@@ -236,8 +252,9 @@ dotnet publish PGame-TSManager/PGame-TSManager.csproj `
 | `PGame-TSManager-template.zip` | 管理器模板和两套 TShock 模板 |
 | `PGame-TSManager-source.zip` | 源码、工作流和维护脚本 |
 
-每次 `main` 推送会生成测试 Release；推送 `v*` 标签会生成正式 Release。
-仓库只保留最新 10 条 Release，更早的 Release 和对应 tag 会在构建后自动清理。
+**GitHub 不再构建、也不再发布**（2026-10-11 起）：流水线 `build.yml` 已移除，
+历史 Artifacts 与 Release 资产已清空，`.github/workflows/prune.yml` 每日兜底删净残留。
+构建一律在本地（上面一条命令），产物由维护方直接部署到服务器使用。
 
 ## 通用版与个人版
 

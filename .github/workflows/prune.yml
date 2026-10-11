@@ -1,6 +1,8 @@
 name: Prune storage (artifacts / caches / releases)
 
 # 一键清理 GitHub Actions 存储占用（Artifacts / Caches / 旧 Release 资产），并每天自动跑一次。
+# ⚠ 2026-10-11 策略变更：本仓库**不再在 GitHub 上构建**（只存上游最新源码，构建改本地）。
+#    因此默认值改为「全部清空」：artifact_days=0 / cache_days=0 / release_keep=0（保留源码与 tag，只删构建产物）。
 # 用法：仓库 → Actions → 本工作流 → Run workflow（可留空用默认值；dry_run=true 只列不删）。
 # 权限：仅使用仓库内置 GITHUB_TOKEN（actions:write + contents:write），不需要 PAT。
 
@@ -13,15 +15,15 @@ on:
       artifact_days:
         description: "删除超过 N 天的 Artifacts（0 = 全删）"
         required: false
-        default: "1"
+        default: "0"
       cache_days:
         description: "删除超过 N 天的 Caches（0 = 全删）"
         required: false
-        default: "1"
+        default: "0"
       release_keep:
         description: "保留最近 N 个 Release（其余连资产一起删）"
         required: false
-        default: "2"
+        default: "0"
       run_days:
         description: "顺带删除超过 N 天的已完成 workflow run（0 = 不动；删 run 会连日志一起清）"
         required: false
