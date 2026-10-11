@@ -121,6 +121,11 @@ jobs:
           name: PGame-TSManager-${{ github.sha }}
           path: artifacts/*
           if-no-files-found: error
+          # ⚠ 这个 artifact 只是 build → release/publish-build 两个 job 之间的**传递媒介**
+          # （单个约 270MB：三个 zip + 自包含 exe），耐久副本在 Release 资产里。
+          # 默认保留 90 天会把 0.5GB 的组织配额直接撑爆（2026-10-11 实测：98 个 artifact ≈ 23.5GB）
+          # → 压到 GitHub 允许的最小值 1 天；Release 侧保留数改为 2（见下方 Prune-GitHubReleases.ps1 调用）
+          retention-days: 1
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -157,7 +162,7 @@ jobs:
           ./maintenance/tools/Prune-GitHubReleases.ps1 `
             -Repository '${{ github.repository }}' `
             -Token $env:GH_TOKEN `
-            -Keep 10
+            -Keep 2   # ⚠ 0.5GB 组织配额：每个 Release ~182MB，只保留最近 2 个（2026-10-11 起）
 
   publish-build:
     if: >-
@@ -201,4 +206,4 @@ jobs:
           ./maintenance/tools/Prune-GitHubReleases.ps1 `
             -Repository '${{ github.repository }}' `
             -Token $env:GH_TOKEN `
-            -Keep 10
+            -Keep 2   # ⚠ 0.5GB 组织配额：每个 Release ~182MB，只保留最近 2 个（2026-10-11 起）
