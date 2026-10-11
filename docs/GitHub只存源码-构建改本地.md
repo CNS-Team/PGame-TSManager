@@ -77,3 +77,17 @@ powershell -ExecutionPolicy Bypass -File .\scripts\Build-Local.ps1 `
 3. 因此"**把私有仓库转 public**"是一条与"付款 / 调整 spending limit"并列的**真实可行的止血手段**（公开库 Actions 免费）；
 4. 私有库（`-Personal` / `PGameAPI` / `PigeonRPG`）在用户处理完 Billing 前，**任何 run 都不会启动**；
    这段期间要个人版产物，直接用本地 `scripts\Build-Local.ps1`（23 秒、0 成本、不经过 GitHub Actions）。
+
+## 当前状态与约定（2026-10-11 23:3x 定，双方已对齐）
+
+```text
+① 私有库 CI 一律【不要触发】—— 在用户处理完 Billing（付款方式 / spending limit / 或转 public）之前
+   任何 run 都是 3-4 秒 failure 的失败记录，只会刷垃圾；公开库（PGame-TSManager）不受影响，prune.yml 照常可用。
+② 个人版产物的主路径 = 本地打包（Billing 未修好期间的唯一路径）：
+     pwsh -File .\scripts\Build-Local.ps1 -SkipSync
+   11-Bot 实测：9.5 秒 → artifacts\PGame-TSManager-personal.zip 82.8 MB / 336 条目；
+   TSM 侧核对同一文件：86,811,188 B（≈82.8 MB）。这个体积/条目数即日后 CI 恢复时的验收基线（产物 ≤82MB、artifact 数 ≤1）。
+③ -SkipSync 的语义：不重新 clone 公共 Core，用本地 core 克隆 + D:\59934\Desktop\PGame-TSManager 同步 overlay
+   ⇒ **离线可用**（不需要 Clash）；只有需要真正 `Sync-Core.ps1` 从 github.com 拉取时，本机才必须挂代理 7890。
+④ 个人库 .gitignore 已含 artifacts/ / core/ / *.zip ⇒ 构建后工作区保持干净（TSM 侧已复核）。
+```
