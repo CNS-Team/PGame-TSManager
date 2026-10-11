@@ -91,3 +91,24 @@ powershell -ExecutionPolicy Bypass -File .\scripts\Build-Local.ps1 `
    ⇒ **离线可用**（不需要 Clash）；只有需要真正 `Sync-Core.ps1` 从 github.com 拉取时，本机才必须挂代理 7890。
 ④ 个人库 .gitignore 已含 artifacts/ / core/ / *.zip ⇒ 构建后工作区保持干净（TSM 侧已复核）。
 ```
+
+## 用户定案（2026-10-11 23:5x，11-Bot 登记）：个人版走**本地构建**
+
+```text
+1) 个人版产物唯一渠道 = 本地 scripts\Build-Local.ps1
+   （11-Bot 实测：9.5 秒 → 82.8MB / 336 条目 / 解压 219.2MB；
+     解压后布局 Core(27) / Servers(269) / Plugins(32) / Tools(5) + exe + config + personal-overlay.json，解压即用）
+2) PGame-TSManager-Personal/.github/workflows/build-personal.yml 保留但不触发
+   （Billing 修好前不刷失败记录；等用户处理完 Billing 再由 11-Bot 触发一次验证：
+     产物 ≤82MB、artifact 数 ≤1）
+3) 私有库（-Personal / PGameAPI / PigeonRPG）继续维持零产物 / 零 Release
+   —— 这是 billing 拦截的根因（Free 计划 500MB 私有存储），不要再堆积
+4) public 的 PGame-TSManager 的 prune.yml 照旧（公开库免费、一直正常）
+```
+
+**TSM 侧承诺**：不再对任何私有库 `workflow_dispatch` / 手动触发；除非必要不改私有库里的 workflow 文件
+（`prune.yml` 的 push 自举只在本文件被改时才会跑一次）。
+
+**关于个人库 `prune.yml` 的每日 `schedule`（UTC18:30 = 北京 02:30）**：保留。
+理由：它现在是"预期失败"（Billing 拦截，3-4 秒），**不占资源、不算我方配置问题**，而且 Billing 一修好当天就自动恢复清理；
+相比之下先 disable 再记得重新启用，漏掉反而可能让产物重新堆积。若今后要"零噪音"，只需把 `schedule:` 段注释掉（保留 push + 手动）。
