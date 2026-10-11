@@ -339,3 +339,29 @@ TSM 每 ~30s 经 WMI 扫描 `TShock.Server.exe`，凡是**不属于任何 TSM �
 - **旧 id 已废弃**：`pigeon-live / liuguang-city / terra-mainland / liuguang-realm` 不再作为 `id`（但按名字匹配仍可用）。
 - `/tsm/servers` 每项额外带 **`label`**（下拉框同款，含序号，如 `"0. 鸽子直播服"`、`"1. 流光城"`）。
 - ⚠ **`restTokenAlias` 由 id 派生** = `"<id>-rest"`：**改 id 会连带改别名**。客户端若按别名存直连表，改 id 时必须同步（例如 `liuguang-city-rest` → `1-rest`）。
+
+## 日志位置（排查 / 存证用，2026-10-11 踩坑后补）
+
+| 文件 | 位置 | 内容与注意 |
+|---|---|---|
+| **管理端日志** | `Core\Logs\<服>-yyyyMMdd.log` | TSM 面板收到的服务器输出，**按天**一个文件。**存档/自动保存证据在这里**：`正在保存世界数据`、`世界已经保存到(...)`、`[周期保存]` / `[离场保存]` 行 |
+| 沙箱日志 | `Core\_runtime\<服>\Logs\<启动时间>.log` | TShock 自己写的运行日志，**每轮启动一个文件、且会缺行**（实测 3.5 小时那轮只剩 210 行）。**不要用它判断"有没有存过档"**（会得出错误结论） |
+| 容量采样 | `Core\Data\capacity-samples.csv` | 每 `capacitySampleSeconds` 秒一行：`时间,serverId,label,人数,cpu百分比,工作集MB,私有MB` |
+| 世界文件 | `Servers\Worlds\*.wld` | mtime = 最后一次落盘时刻，可用来验证 `/save` 是否生效 |
+
+自动化保存相关的 `manager.json` 开关：
+
+```json
+{
+  "periodicSaveEnabled": true,          // 0 人服周期补存
+  "periodicSaveMinutes": 15,            // 周期（分钟）
+  "periodicSaveOnlyWhenEmpty": true,    // 有人在线时交给 TShock 自己的 10 分钟自动保存
+  "saveOnLastPlayerLeave": true         // 最后一名玩家离线立刻补存一次
+}
+```
+
+日志检索示例（PowerShell）：
+
+```powershell
+Select-String -Path 'Core\Logs\泰拉大陆-*.log' -Pattern '周期保存|离场保存|正在保存世界数据'
+```

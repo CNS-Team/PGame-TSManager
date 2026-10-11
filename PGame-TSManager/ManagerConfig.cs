@@ -193,9 +193,15 @@ namespace PGameTSManager
         /// 对「正在运行且当前 0 人在线」的服发一次 /save 兜底。
         /// </summary>
         public bool periodicSaveEnabled = true;
-        public int periodicSaveMinutes = 30;
+        public int periodicSaveMinutes = 15;
         /// <summary>true = 只保存 0 人在线的服（有人在线时交给 TShock 自己的自动保存）。</summary>
         public bool periodicSaveOnlyWhenEmpty = true;
+        /// <summary>
+        /// 最后一名玩家离线时立即补存一次（默认开）。
+        /// TShock 的自动保存只在有人在线时按 10 分钟跑，人一走就停 ——
+        /// 「玩家刚走 → 下一个人进来之前」这段时间的世界改动否则不会落盘。
+        /// </summary>
+        public bool saveOnLastPlayerLeave = true;
 
         // —— 本地控制 API（默认关闭；个人版 overlay 才开启） ——
         public bool controlApiEnabled = false;

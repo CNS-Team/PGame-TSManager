@@ -117,6 +117,8 @@ namespace PGameTSManager
         private DispatcherTimer? _scheduleTimer;
         private DispatcherTimer? _capacityTimer;
         private DispatcherTimer? _periodicSaveTimer;
+        /// <summary>上一轮轮询到的在线人数（用于检测「最后一名玩家离线」）。</summary>
+        private readonly Dictionary<string, int> _lastPlayerCount = new();
         private DateTime _lastConflictScanUtc = DateTime.MinValue;
         private readonly HashSet<int> _reportedConflictPids = new();
         private string _lastAlertResult = "";
@@ -151,6 +153,7 @@ namespace PGameTSManager
                         await c.RefreshStatusAsync();
                         c.TickWatchdog();
                         c.TickIdleMemory();
+                        TickLastPlayerLeaveSave(c);
                     }
                     catch { }
                 }
@@ -295,13 +298,47 @@ namespace PGameTSManager
                     if (!c.IsRunning) continue;
                     // 有人在线时交给 TShock 自己的自动保存，避免重复写盘。
                     if (_cfg.periodicSaveOnlyWhenEmpty && c.PlayerCount > 0) continue;
-                    var err = c.SendCommandViaRest("/save", out _);
-                    AppendLine(err == null
-                        ? $"[定时保存] {c.ListLabel} 已保存世界（0 人在线兜底）。"
-                        : $"[定时保存] {c.ListLabel} 保存失败：{err}");
+                    SaveWorld(c, "周期保存", "0 人补存");
                 }
                 catch { }
             }
+        }
+
+        /// <summary>
+        /// 最后一个玩家离线时立即补存一次。
+        /// 动机：TShock 自动保存只在「有人在线」时按 10 分钟跑，人一走就停 ——
+        /// 「玩家刚走 → 下一个人进来之前」这段时间的世界改动完全不落盘。
+        /// 在状态轮询（5 秒）里检测 PlayerCount 由 &gt;0 变 0 的瞬间触发。
+        /// </summary>
+        private void TickLastPlayerLeaveSave(ServerContainer c)
+        {
+            if (!_cfg.saveOnLastPlayerLeave) return;
+            int now;
+            try { now = c.IsRunning ? Math.Max(0, c.PlayerCount) : 0; } catch { return; }
+            _lastPlayerCount.TryGetValue(c.Name, out var prev);
+            _lastPlayerCount[c.Name] = now;
+            if (prev <= 0 || now != 0) return;          // 只在「>0 → 0」那一次触发
+            SaveWorld(c, "离场保存", "最后一名玩家离线");
+        }
+
+        /// <summary>
+        /// 统一的「主动落盘」入口：发 /save 并写一行可检索日志（world / size 便于审计与验证"是否真在跑"）。
+        /// 标签形如 `[周期保存]` / `[离场保存]`，都是纯 ASCII 方括号 + 中文说明，便于 grep。
+        /// </summary>
+        private void SaveWorld(ServerContainer c, string tag, string reason)
+        {
+            try
+            {
+                var err = c.SendCommandViaRest("/save", out _);
+                var worldFile = "";
+                try { worldFile = Path.GetFileName(c.WorldPath); } catch { }
+                var size = c.WorldSizeBytes;
+                if (err == null)
+                    AppendLine($"[{tag}] {c.ListLabel} {reason} → world={worldFile} size={size}");
+                else
+                    AppendLine($"[{tag}] {c.ListLabel} 保存失败：{err}");
+            }
+            catch (Exception ex) { AppendLine($"[{tag}] {c.ListLabel} 保存异常：{ex.Message}"); }
         }
 
         private void UpdateTrayTip()
