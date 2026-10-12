@@ -169,6 +169,14 @@ namespace PGameTSManager
         /// 只删日志，不碰世界/备份（见 <see cref="backupKeep"/> 与 `Servers\Worlds\*.wld*`）。
         /// </summary>
         [JsonProperty("日志保留天数")] public int logRetentionDays = 30;
+
+        /// <summary>
+        /// 陈旧残留清理（默认开）：只清**可证明冗余**的两类 ——
+        /// ① 沙箱 `ServerPlugins.disabled\*.dll` 中「插件总库还有同名」的停用副本（PluginSync 随时可恢复）；
+        /// ② 单文件自包含部署下，程序目录里另一次发布模式残留的 `PGame-TSManager.dll/.deps.json/.runtimeconfig.json`。
+        /// 总库没有同名的停用插件、以及非单文件部署，一律不删（详见 ManagerHousekeeping）。
+        /// </summary>
+        [JsonProperty("清理陈旧残留")] public bool cleanupStaleArtifacts = true;
         [JsonProperty("服务器列表")] public List<ServerProfile> serverProfiles = new();
         [JsonProperty("外部进程")] public List<ExternalProcessProfile> externalProcesses = new();
 
@@ -294,6 +302,7 @@ namespace PGameTSManager
             ["backupKeep"] = "备份保留数",
             ["exeBackupKeep"] = "主程序备份保留数",
             ["logRetentionDays"] = "日志保留天数",
+            ["cleanupStaleArtifacts"] = "清理陈旧残留",
             ["serverProfiles"] = "服务器列表",
             ["externalProcesses"] = "外部进程",
             ["sharedRuntimeDir"] = "运行时母本目录",

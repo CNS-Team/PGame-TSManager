@@ -50,6 +50,11 @@ namespace PGameTSManager
             try { parts.Add(TrimExeBackups(cfg.exeBackupKeep)); } catch (Exception ex) { parts.Add("主程序备份清理失败：" + ex.Message); }
             try { parts.Add(TrimLogs(cfg.logRetentionDays)); } catch (Exception ex) { parts.Add("日志清理失败：" + ex.Message); }
             try { parts.Add(TrimSandboxLogs(cfg.logRetentionDays)); } catch (Exception ex) { parts.Add("沙箱日志清理失败：" + ex.Message); }
+            if (cfg.cleanupStaleArtifacts)
+            {
+                try { parts.Add(TrimDisabledPluginLeftovers()); } catch (Exception ex) { parts.Add("停用插件残留清理失败：" + ex.Message); }
+                try { parts.Add(TrimAppPublishLeftovers()); } catch (Exception ex) { parts.Add("发布残留清理失败：" + ex.Message); }
+            }
 
             var summary = "[清理] " + string.Join("；", parts);
             Log(summary);
@@ -152,6 +157,81 @@ namespace PGameTSManager
             return deleted == 0
                 ? $"沙箱日志 {scanned} 个（保留 {days} 天，无过期）"
                 : $"沙箱日志删除 {deleted} 个 / {freed / 1024.0 / 1024.0:F2} MB（保留 {days} 天，剩 {scanned - deleted} 个）";
+        }
+
+        /// <summary>
+        /// `Core\_runtime\&lt;服&gt;\ServerPlugins.disabled\*.dll` 的**冗余**残留。
+        ///
+        /// 规则（保守）：**只删"插件总库里还有同名 DLL"的那些** —— 它们随时可由 PluginSync 恢复，
+        /// 留着纯粹占用与迷惑（沙箱里那份停用副本毫无信息量）；总库里没有同名的（或 `.bak-*`、
+        /// `server.properties` 之类非 dll）一律**保留**并在清理行里报数，绝不丢唯一副本。
+        /// </summary>
+        private static string TrimDisabledPluginLeftovers()
+        {
+            var cfg = ManagerConfig.Instance;
+            var runtime = ManagerConfig.Resolve(cfg.runtimeDir);
+            var library = ManagerConfig.Resolve(cfg.pluginDir);
+            if (!Directory.Exists(runtime)) return "停用插件残留 0 个（无沙箱目录）";
+
+            var deleted = 0; var kept = 0; long freed = 0;
+            foreach (var dir in Directory.GetDirectories(runtime))
+            {
+                var dis = Path.Combine(dir, "ServerPlugins.disabled");
+                if (!Directory.Exists(dis)) continue;
+                foreach (var f in new DirectoryInfo(dis).GetFiles("*.dll", SearchOption.TopDirectoryOnly))
+                {
+                    try
+                    {
+                        if (!File.Exists(Path.Combine(library, f.Name))) { kept++; continue; }   // 总库没有 → 保留（唯一副本）
+                        var size = f.Length;
+                        f.Delete();
+                        freed += size;
+                        deleted++;
+                    }
+                    catch { kept++; }
+                }
+            }
+            return deleted == 0
+                ? $"停用插件残留 0 个可清（保留 {kept} 个总库无同名的）"
+                : $"停用插件残留删除 {deleted} 个 / {freed / 1024.0:F1} KB（总库可恢复；保留 {kept} 个总库无同名的）";
+        }
+
+        /// <summary>
+        /// 程序目录里**另一次发布模式**的残留：`PGame-TSManager.dll` / `.deps.json` / `.runtimeconfig.json`。
+        ///
+        /// 安全性靠**发布形态判定**：只有当前 exe 是**单文件自包含**（&gt;50MB）时才删 ——
+        /// 框架依赖发布的小 exe + dll 组合绝不会被误删（那种情况下 exe 只有几百 KB）。
+        /// </summary>
+        private static string TrimAppPublishLeftovers()
+        {
+            var dir = ManagerConfig.BaseDir;
+            var exe = Path.Combine(dir, "PGame-TSManager.exe");
+            if (!File.Exists(exe)) return "发布残留 0 个（无 exe）";
+
+            var exeSize = new FileInfo(exe).Length;
+            if (exeSize < 50L * 1024 * 1024)
+                return "发布残留未清（当前 exe 不是单文件自包含，dll 可能是运行必需，跳过）";
+
+            var names = new[] { "PGame-TSManager.dll", "PGame-TSManager.deps.json", "PGame-TSManager.runtimeconfig.json" };
+            var deleted = 0; long freed = 0;
+            foreach (var n in names)
+            {
+                var p = Path.Combine(dir, n);
+                if (!File.Exists(p)) continue;
+                try
+                {
+                    var fi = new FileInfo(p);
+                    if ((DateTime.UtcNow - fi.LastWriteTimeUtc).TotalHours < 24) continue;   // 24h 内不动（可能正在部署）
+                    var size = fi.Length;
+                    fi.Delete();
+                    freed += size;
+                    deleted++;
+                }
+                catch { }
+            }
+            return deleted == 0
+                ? "发布残留 0 个可清（单文件自包含，无遗留 dll/deps/runtimeconfig）"
+                : $"发布残留删除 {deleted} 个 / {freed / 1024.0:F1} KB（单文件自包含部署下的另一次发布残留）";
         }
     }
 }
