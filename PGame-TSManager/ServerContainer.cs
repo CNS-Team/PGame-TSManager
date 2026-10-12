@@ -1105,11 +1105,32 @@ namespace PGameTSManager
             catch { }
         }
 
+        /// <summary>
+        /// 把沙箱里的文件（exe / GeoIP.dat）链到运行时母本。
+        ///
+        /// ⚠ 2026-10-12 修「升级后沙箱不跟着换」的坑：
+        ///   `mklink /H` 建的是**硬链接**（与母本同一个 inode）。而运行时升级脚本
+        ///   （Invoke-TShockUpdate.ps1）是 `copy→tmp` + `Move-Item` **覆盖**目标 → 母本换了新 inode，
+        ///   老链接仍指向旧文件 ⇒ 沙箱里实际还是**旧运行时**。原来这里"文件已存在就跳过"，所以永远修不回来。
+        ///   现在：链接/副本已存在时比较「大小 + 修改时间」——同一个 inode 必然完全一致；
+        ///   不一致（或指向不同文件）就**只删链接**再重建，绝不碰母本。
+        /// </summary>
         private static void LinkFile(string target, string link)
         {
-            if (File.Exists(link) || !File.Exists(target)) return;
-            if (RunCmd($"mklink /H \"{link}\" \"{target}\"") && File.Exists(link)) return;
-            try { File.Copy(target, link, true); } catch { }
+            try
+            {
+                if (!File.Exists(target)) return;
+                if (File.Exists(link))
+                {
+                    var a = new FileInfo(target);
+                    var b = new FileInfo(link);
+                    if (a.Length == b.Length && a.LastWriteTimeUtc == b.LastWriteTimeUtc) return;   // 同 inode（或内容一致）
+                    try { File.Delete(link); } catch { return; }                                    // 只删链接，不动母本
+                }
+                if (RunCmd($"mklink /H \"{link}\" \"{target}\"") && File.Exists(link)) return;
+                try { File.Copy(target, link, true); } catch { }
+            }
+            catch { }
         }
 
         private static void LinkDirectory(string target, string link)

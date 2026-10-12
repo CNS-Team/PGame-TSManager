@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <AssemblyName>TSMProbe</AssemblyName>
+    <Nullable>disable</Nullable>
+    <TShockRoot Condition="'$(TShockRoot)' == ''">D:\59934\Desktop\PGame-TSManager</TShockRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="TShockAPI"><HintPath>$(TShockRoot)\Plugins\TShockAPI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="TerrariaServer"><HintPath>$(TShockRoot)\Core\bin\TerrariaServer.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>

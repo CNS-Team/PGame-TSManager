@@ -133,6 +133,17 @@ internal sealed class ControlApiServer : IDisposable
                 await HandleWorldRebuildAsync(ctx);
                 return;
             }
+            // 桥接插件（TSMBridge，装在 TShock 内）推上来的进程内事件 —— 只接收，不控制
+            if (method == "POST" && path == "/tsm/plugins/bridge/events")
+            {
+                await HandleBridgeEventsAsync(ctx);
+                return;
+            }
+            if (method == "GET" && path == "/tsm/bridge")
+            {
+                await WriteJsonAsync(ctx, 200, new { ok = true, contractVersion = "tsm.control.v1", servers = BridgeState.Snapshot() });
+                return;
+            }
             if (method == "POST" && path.StartsWith("/tsm/external/", StringComparison.OrdinalIgnoreCase))
             {
                 await HandleExternalActionAsync(ctx, path);
@@ -341,7 +352,30 @@ internal sealed class ControlApiServer : IDisposable
         await WriteJsonAsync(ctx, 404, new { ok = false, error = "unknown_action" });
     }
 
-    private async Task HandleWorldRebuildAsync(HttpListenerContext ctx)
+        /// <summary>
+        /// 桥接事件入口（TSMBridge 插件 → TSM）。
+        /// body: { "serverId": "0", "events": [ { "type": "...", "at": "...", "data": { ... } } ] }
+        /// 只更新状态 + 转发到事件流；不做任何生命周期动作。
+        /// </summary>
+        private async Task HandleBridgeEventsAsync(HttpListenerContext ctx)
+        {
+            var body = await ReadBodyAsync(ctx.Request);
+            JObject json;
+            try { json = JObject.Parse(body); }
+            catch { await WriteJsonAsync(ctx, 400, new { ok = false, error = "invalid_json" }); return; }
+
+            var serverId = json["serverId"]?.ToString() ?? "";
+            if (string.IsNullOrWhiteSpace(serverId))
+            {
+                await WriteJsonAsync(ctx, 400, new { ok = false, error = "serverId_required" });
+                return;
+            }
+            var events = json["events"] as JArray;
+            var accepted = BridgeState.Ingest(serverId, events);
+            await WriteJsonAsync(ctx, 200, new { ok = true, serverId, accepted });
+        }
+
+        private async Task HandleWorldRebuildAsync(HttpListenerContext ctx)
     {
         var body = await ReadBodyAsync(ctx.Request);
         var json = JObject.Parse(body);

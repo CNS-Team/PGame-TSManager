@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- TSM ⇄ TShock 桥接插件：把进程内事件（玩家进出/保存/tick/插件加载/慢指令/错误率）推给 TSM。
+       Harmony 只挂 TShockAPI / HotReload 自身的方法；【绝不】挂 Terraria/OTAPI ——
+       那些方法已被 ModFramework 生成 2,722 个 mfwh_ 包装，再叠 Harmony 就是第二个改写者（自递归事故模式）。 -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <AssemblyName>TSMBridge</AssemblyName>
+    <RootNamespace>TSMBridge</RootNamespace>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <!-- 插件是"库"工程，默认不会把 NuGet 依赖复制到输出 —— 显式打开，这样 0Harmony.dll 会跟着产物出来，部署不遗漏 -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <NoWarn>$(NoWarn);CS0618</NoWarn>
+    <!-- 参考件来源：本机 TSM 部署（远程同版本）。没有就传 -p:TShockRoot=<path> -->
+    <TShockRoot Condition="'$(TShockRoot)' == ''">D:\59934\Desktop\PGame-TSManager</TShockRoot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Lib.Harmony：需要随插件部署（放到运行时的 bin\，见 README） -->
+    <PackageReference Include="Lib.Harmony" Version="2.2.0" />
+
+    <Reference Include="TShockAPI"><HintPath>$(TShockRoot)\Plugins\TShockAPI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="OTAPI"><HintPath>$(TShockRoot)\Core\bin\OTAPI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="TerrariaServer"><HintPath>$(TShockRoot)\Core\bin\TerrariaServer.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="ModFramework"><HintPath>$(TShockRoot)\Core\bin\ModFramework.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+</Project>

@@ -49,6 +49,7 @@ namespace PGameTSManager
             var parts = new List<string>();
             try { parts.Add(TrimExeBackups(cfg.exeBackupKeep)); } catch (Exception ex) { parts.Add("主程序备份清理失败：" + ex.Message); }
             try { parts.Add(TrimLogs(cfg.logRetentionDays)); } catch (Exception ex) { parts.Add("日志清理失败：" + ex.Message); }
+            try { parts.Add(TrimSandboxLogs(cfg.logRetentionDays)); } catch (Exception ex) { parts.Add("沙箱日志清理失败：" + ex.Message); }
 
             var summary = "[清理] " + string.Join("；", parts);
             Log(summary);
@@ -113,6 +114,44 @@ namespace PGameTSManager
             return n == 0
                 ? $"日志 {files.Length} 个（保留 {days} 天，无过期）"
                 : $"日志删除 {n} 个 / {freed / 1024.0 / 1024.0:F2} MB（保留 {days} 天，剩 {files.Length - n} 个）";
+        }
+
+        /// <summary>
+        /// 各服运行沙箱里的 TShock 自己写的日志（`Core\_runtime\&lt;服&gt;\Logs\*.log`）。
+        /// 管理器日志有保留策略，但沙箱日志此前没人清 —— 沙箱里那些文件会一直涨。
+        /// 同样只删 `*.log`，不碰沙箱里其它任何东西。
+        /// </summary>
+        private static string TrimSandboxLogs(int days)
+        {
+            if (days <= 0) return "沙箱日志保留天数 ≤ 0（按配置不清理）";
+            var runtime = ManagerConfig.Resolve(ManagerConfig.Instance.runtimeDir);
+            if (!Directory.Exists(runtime)) return "沙箱目录不存在（无需清理）";
+
+            var cutoff = DateTime.UtcNow.AddDays(-days);
+            long freed = 0;
+            var deleted = 0;
+            var scanned = 0;
+            foreach (var dir in Directory.GetDirectories(runtime))
+            {
+                var logDir = Path.Combine(dir, "Logs");
+                if (!Directory.Exists(logDir)) continue;
+                foreach (var f in new DirectoryInfo(logDir).GetFiles("*.log", SearchOption.TopDirectoryOnly))
+                {
+                    scanned++;
+                    try
+                    {
+                        if (f.LastWriteTimeUtc >= cutoff) continue;
+                        var size = f.Length;
+                        f.Delete();
+                        freed += size;
+                        deleted++;
+                    }
+                    catch { }
+                }
+            }
+            return deleted == 0
+                ? $"沙箱日志 {scanned} 个（保留 {days} 天，无过期）"
+                : $"沙箱日志删除 {deleted} 个 / {freed / 1024.0 / 1024.0:F2} MB（保留 {days} 天，剩 {scanned - deleted} 个）";
         }
     }
 }
