@@ -425,11 +425,30 @@ namespace PGameTSManager
                     var raw = File.ReadAllText(path);
                     var migrated = MigrateLegacyKeys(raw);      // 旧英文键 → 中文键（幂等）
                     var cfg = JsonConvert.DeserializeObject<ManagerConfig>(migrated);
-                    if (!ReferenceEquals(migrated, raw) && !string.Equals(migrated, raw, StringComparison.Ordinal))
+                    if (cfg == null) return new ManagerConfig();
+
+                    // 需要落盘的两种情况：
+                    //   ① 键名刚从英文迁移过来；
+                    //   ② 磁盘上的键集合 ≠ 当前版本的键集合（缺新字段 / 有已删字段）——
+                    //      补全后 config.json 就是"当前版本全部可调项"的中文清单，用户能直接看见每个开关。
+                    var needRewrite = false;
+                    var canonical = JsonConvert.SerializeObject(cfg, Formatting.Indented);
+                    try
                     {
-                        // 迁移成功：原文件留一份备份，再把中文键格式写回（下次启动就走快路径）
+                        if (!string.Equals(migrated, raw, StringComparison.Ordinal)) needRewrite = true;
+                        else
+                        {
+                            var diskKeys = JObject.Parse(raw).Properties().Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
+                            var mineKeys = JObject.Parse(canonical).Properties().Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
+                            if (!diskKeys.SetEquals(mineKeys)) needRewrite = true;
+                        }
+                    }
+                    catch { }
+
+                    if (needRewrite)
+                    {
                         try { File.Copy(path, path + ".bak-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"), true); } catch { }
-                        try { File.WriteAllText(path, migrated); } catch { }
+                        try { File.WriteAllText(path, canonical); } catch { }   // 全量中文键（含当前版本所有字段）
                     }
                     return cfg;
                 }
