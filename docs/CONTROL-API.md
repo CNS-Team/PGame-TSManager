@@ -277,24 +277,35 @@ TSM 每 ~30s 经 WMI 扫描 `TShock.Server.exe`，凡是**不属于任何 TSM �
 
 `externalProcesses` 是通用外部进程列表。公共 Core 只定义结构，默认列表为空，私人条目由个人版 overlay 配置。
 
+> ⚠ **两层键名口径（2026-10-12 起，务必分清）**
+> ```text
+> ① 配置文件 <TSM 根>\config.json 的 外部进程[] → **中文键**（下面这份就是"配置写法"，2026-10-12 汉化）
+> ② 本 Control API 的 HTTP 响应字段          → **英文，契约不变**
+>    GET /tsm/external → id / name / enabled / kind / state / pid / processName / healthMode /
+>                        healthOk / healthUrl / healthPorts / logDir / logActive / watchdog / autoRestart / at
+> ```
+> 原因：`ExternalProcessRuntime.Snapshot()` 返回**匿名对象**（字段名写死在代码里），
+> `[JsonProperty("中文")]` 只影响**序列化到配置文件**那条路径。**客户端不需要改任何解析代码。**
+> 旧版英文键的配置文件在 TSM 首次启动时自动迁移（原文件备份 `config.json.bak-<时间戳>`），取值不变。
+
 ```json
 {
-  "kind": "external-process",
-  "id": "example",
-  "name": "Example",
-  "enabled": true,
-  "workdir": "C:\\Example",
-  "exe": "Example.exe",
-  "processName": "",
-  "args": [],
-  "stopArgs": [],
-  "healthMode": "http",
-  "healthPorts": [1234],
-  "healthUrl": "http://127.0.0.1:1234/api/v1/health",
-  "logDir": "C:\\Example\\Logs",
-  "logActiveSeconds": 300,
-  "watchdog": "none",
-  "autoRestart": false
+  "类型": "external-process",
+  "标识": "example",
+  "名称": "Example",
+  "启用": true,
+  "工作目录": "C:\\Example",
+  "可执行文件": "Example.exe",
+  "进程名": "",
+  "启动参数": [],
+  "停止参数": [],
+  "健康检查方式": "http",
+  "健康端口": [1234],
+  "健康地址": "http://127.0.0.1:1234/api/v1/health",
+  "日志目录": "C:\\Example\\Logs",
+  "日志活跃判定秒": 300,
+  "看门狗": "none",
+  "自动重启": false
 }
 ```
 
