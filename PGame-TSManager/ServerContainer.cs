@@ -1256,7 +1256,7 @@ namespace PGameTSManager
                 if (wasUserStop || wasMaintenanceExit)
                 {
                     _restartCount = 0;
-                    AddText(wasUserStop
+                    AddTextLogOnly(wasUserStop
                         ? "[看门狗] 这是手动停止，不自动重启\n"
                         : "[看门狗] 这是维护/换图操作期间退出，不自动重启\n");
                     return;
@@ -1267,7 +1267,7 @@ namespace PGameTSManager
                 if (code == 0 && !_watchdogRestarting)
                 {
                     _restartCount = 0;
-                    AddText("[看门狗] 服务器正常退出（退出码 0），不自动重启\n");
+                    AddTextLogOnly("[看门狗] 服务器正常退出（退出码 0），不自动重启\n");
                     return;
                 }
 
@@ -1714,7 +1714,7 @@ namespace PGameTSManager
             _lastHealthyUtc = DateTime.UtcNow;
             var seconds = Math.Max(120, _managerConfig.watchdogMaintenanceSuppressSeconds);
             _watchdogSuppressUntilUtc = DateTime.UtcNow.AddSeconds(seconds);
-            AddText($"[看门狗] 检测到维护命令，暂停健康检查 {seconds} 秒\n");
+            AddTextLogOnly($"[看门狗] 检测到维护命令，暂停健康检查 {seconds} 秒\n");
         }
 
         /// <summary>读取该服 TShock REST JSON 接口。成功返回 null，body 为响应文本。</summary>
@@ -1854,6 +1854,18 @@ namespace PGameTSManager
             var dispatcher = _para.Dispatcher;
             if (dispatcher == null) return;
             try { dispatcher.BeginInvoke(new Action(() => AppendText(text, isError))); } catch { }
+        }
+
+        /// <summary>
+        /// 只写日志文件、不刷控制台面板（消息仍在 Core\Logs\&lt;服&gt;-&lt;日期&gt;.log 里，带时间戳）。
+        /// 口径（2026-10-13 定案）：看门狗的**例行说明类**提示走这里；
+        /// 异常/需人工知悉类（崩溃、自动重启、放弃重启、死服等）仍走 AddText 上控制台。
+        /// **今后新增看门狗提示一律先分级：例行 → AddTextLogOnly；异常 → AddText。**
+        /// </summary>
+        private void AddTextLogOnly(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            WriteToFile(text);
         }
 
         /// <summary>Terraria 彩色文本标记：[c/RRGGBB:文字]</summary>
@@ -2070,7 +2082,7 @@ namespace PGameTSManager
 
                         if (!process.HasExited)
                         {
-                            AddText($"[看门狗] 发现同沙箱残留进程 PID {process.Id}，正在清理\n");
+                            AddTextLogOnly($"[看门狗] 发现同沙箱残留进程 PID {process.Id}，正在清理\n");
                             try { process.Kill(true); }
                             catch { try { process.Kill(); } catch { } }
                             if (!process.WaitForExit(10000))
@@ -2087,7 +2099,7 @@ namespace PGameTSManager
 
                 if (killed)
                 {
-                    AddText("[看门狗] 已清理残留服务端，等待文件句柄释放\n");
+                    AddTextLogOnly("[看门狗] 已清理残留服务端，等待文件句柄释放\n");
                     System.Threading.Thread.Sleep(2000);
                 }
             }
