@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <AssemblyName>tsmprobe2</AssemblyName>
+    <Nullable>disable</Nullable>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <TShockRoot Condition="'$(TShockRoot)' == ''">D:\59934\Desktop\PGame-TSManager</TShockRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Lib.Harmony" Version="2.4.3" />
+    <Reference Include="TShockAPI"><HintPath>$(TShockRoot)\Plugins\TShockAPI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="OTAPI"><HintPath>$(TShockRoot)\Core\bin\OTAPI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="TerrariaServer"><HintPath>$(TShockRoot)\Core\bin\TerrariaServer.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>

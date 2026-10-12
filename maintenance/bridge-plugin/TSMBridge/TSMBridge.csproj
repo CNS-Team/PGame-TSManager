@@ -19,7 +19,7 @@
 
   <ItemGroup>
     <!-- Lib.Harmony：需要随插件部署（放到运行时的 bin\，见 README） -->
-    <PackageReference Include="Lib.Harmony" Version="2.2.0" />
+    <PackageReference Include="Lib.Harmony" Version="2.4.3" />
 
     <Reference Include="TShockAPI"><HintPath>$(TShockRoot)\Plugins\TShockAPI.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="OTAPI"><HintPath>$(TShockRoot)\Core\bin\OTAPI.dll</HintPath><Private>false</Private></Reference>

@@ -31,6 +31,11 @@ namespace TSMBridge
     ///   POST {TSM地址}/tsm/plugins/bridge/events
     ///   { "serverId": "0", "events": [ { "type": "...", "at": "...", "data": { ... } } ] }
     /// </summary>
+    // ⚠⚠ 必须有 [ApiVersion]：TShock 的 ServerApi.LoadPlugins 与 HotReload 的 LoadPluginFromDisk
+    //     都会先查 `GetCustomAttribute<ApiVersionAttribute>()`，**没有就直接跳过**（静默，日志里只留
+    //     "未找到有效的 TerrariaPlugin 子类"）。主次版本必须与运行时的 ServerApi.ApiVersion（2.1）一致 ——
+    //     这是 2026-10-12 用 Cecil 反编译 HotReload 才查出来的，写在这里防止再踩。
+    [ApiVersion(2, 1)]
     public class Plugin : TerrariaPlugin
     {
         public override string Name => "TSMBridge";
@@ -203,25 +208,28 @@ namespace TSMBridge
             var harmony = new Harmony("tsmbridge");
 
             // ① TShockAPI.Commands.HandleCommand —— 指令耗时（TShock 没有耗时事件）
+            //    签名：static bool HandleCommand(TSPlayer player, string text) → 用位置参数注入，避免改名踩坑
             TryPatch(harmony, "TShockAPI.Commands", "HandleCommand",
-                nameof(CommandPrefix), nameof(CommandPostfix));
+                nameof(CommandPrefix), nameof(CommandPostfix), new[] { typeof(TSPlayer), typeof(string) });
 
-            // ② TShockAPI.Log.ConsoleError —— 错误率（TSM 现在只能靠日志关键字猜）
-            TryPatch(harmony, "TShockAPI.Log", "ConsoleError",
-                null, nameof(ConsoleErrorPostfix));
-
-            // ③ TShockAPI.Log.ConsoleInfo —— 插件加载（HotReload 会打「已加载 X」）
-            TryPatch(harmony, "TShockAPI.Log", "ConsoleInfo",
-                null, nameof(ConsoleInfoPostfix));
+            // ② 日志：TShockAPI 里没有 `Log` 类，ILog 的**实现类**是 TextLog / SqlLog（Cecil 实测）；
+            //    两个都挂，取到哪个算哪个（另一个通常是包装层）。
+            foreach (var logType in new[] { "TShockAPI.TextLog", "TShockAPI.SqlLog" })
+            {
+                // ⚠ 必须显式给参数类型：TextLog/SqlLog 各有 ConsoleError(string) 与 ConsoleError(string, params object[])
+                //   两个重载，只按名字找会 Harmony 报 "Ambiguous match"（实测踩过）。
+                TryPatch(harmony, logType, "ConsoleError", null, nameof(ConsoleErrorPostfix), new[] { typeof(string) });
+                TryPatch(harmony, logType, "ConsoleInfo", null, nameof(ConsoleInfoPostfix), new[] { typeof(string) });
+            }
         }
 
-        private void TryPatch(Harmony harmony, string typeName, string methodName, string prefix, string postfix)
+        private void TryPatch(Harmony harmony, string typeName, string methodName, string prefix, string postfix, Type[] paramTypes = null)
         {
             try
             {
                 var type = AccessTools.TypeByName(typeName);
                 if (type == null) { LogPatchFail(typeName, methodName, "类型不存在"); return; }
-                var method = AccessTools.Method(type, methodName);
+                var method = paramTypes == null ? AccessTools.Method(type, methodName) : AccessTools.Method(type, methodName, paramTypes);
                 if (method == null) { LogPatchFail(typeName, methodName, "方法不存在"); return; }
                 var hmPrefix = prefix == null ? null : new HarmonyMethod(typeof(Plugin).GetMethod(prefix, System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public));
                 var hmPostfix = postfix == null ? null : new HarmonyMethod(typeof(Plugin).GetMethod(postfix, System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public));
@@ -242,13 +250,13 @@ namespace TSMBridge
         }
 
         [HarmonyPrefix]
-        private static void CommandPrefix(TSPlayer player, string cmd, out Stopwatch __state)
+        private static void CommandPrefix(TSPlayer __0, string __1, out Stopwatch __state)
         {
             __state = Stopwatch.StartNew();
         }
 
         [HarmonyPostfix]
-        private static void CommandPostfix(TSPlayer player, string cmd, Stopwatch __state)
+        private static void CommandPostfix(TSPlayer __0, string __1, Stopwatch __state)
         {
             try
             {
@@ -262,8 +270,8 @@ namespace TSMBridge
                     Interlocked.Increment(ref inst._slowCommandCount);
                     inst.Enqueue("command.slow", new Dictionary<string, object>
                     {
-                        ["player"] = player?.Name ?? "",
-                        ["command"] = cmd ?? "",
+                        ["player"] = __0?.Name ?? "",
+                        ["command"] = __1 ?? "",
                         ["ms"] = Math.Round(ms, 1)
                     });
                 }
