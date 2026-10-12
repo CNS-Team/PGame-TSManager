@@ -59,6 +59,10 @@ namespace PGameTSManager
             StartPeriodicSaveTimer();
             BuildTrayMenu();
 
+            // 管理器自身占用清理（主程序换版备份 + 日志保留）：启动跑一次，之后每 24 小时一次。
+            RunHousekeeping("启动");
+            StartHousekeepingTimer();
+
             if (StartAllOnLoad)
             {
                 _ = StartAllSequentialAsync();      // ★ 顺序启动（不再三台一起抢资源）
@@ -117,6 +121,7 @@ namespace PGameTSManager
         private DispatcherTimer? _scheduleTimer;
         private DispatcherTimer? _capacityTimer;
         private DispatcherTimer? _periodicSaveTimer;
+        private DispatcherTimer? _housekeepingTimer;
         /// <summary>上一轮轮询到的在线人数（用于检测「最后一名玩家离线」）。</summary>
         private readonly Dictionary<string, int> _lastPlayerCount = new();
         private DateTime _lastConflictScanUtc = DateTime.MinValue;
@@ -280,6 +285,23 @@ namespace PGameTSManager
         /// 而 0 人时插件仍会改世界（例：TileHelper 世界加载后贴 出生点.sec3）→ 崩溃/断电会丢。
         /// 这里按 periodicSaveMinutes 给「运行中且 0 人」的服补一次 /save。
         /// </summary>
+        /// <summary>
+        /// 管理器自身占用清理：主程序换版备份（`PGame-TSManager.exe.bak*`，147.6 MB/份）按 `exeBackupKeep` 留最近 N 份；
+        /// `Core\Logs\*.log` 按 `logRetentionDays` 清过期。**不碰** `Core\Backups` 与 `Servers\Worlds\*.wld*`。
+        /// </summary>
+        private void RunHousekeeping(string reason)
+        {
+            try { AppendLine(ManagerHousekeeping.RunOnce() + "（" + reason + "）"); }
+            catch (Exception ex) { AppendLine("[清理] 异常：" + ex.Message); }
+        }
+
+        private void StartHousekeepingTimer()
+        {
+            _housekeepingTimer = new DispatcherTimer { Interval = TimeSpan.FromHours(24) };
+            _housekeepingTimer.Tick += (_, _) => RunHousekeeping("每日");
+            _housekeepingTimer.Start();
+        }
+
         private void StartPeriodicSaveTimer()
         {
             if (!_cfg.periodicSaveEnabled) return;

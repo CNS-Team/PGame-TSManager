@@ -155,6 +155,19 @@ namespace PGameTSManager
         public string dataDir = "Core\\Data";
         public string toolsDir = "Tools";
         public int backupKeep = 10;
+
+        /// <summary>
+        /// 管理器**主程序**换版备份 `PGame-TSManager.exe.bak*` 的保留份数（默认 2）。
+        /// ⚠ 与 <see cref="backupKeep"/> 不是一回事：那个管世界/配置备份（Core\Backups），这个只管主 exe 的换版备份。
+        /// 主 exe 自包含单文件约 **147 MB/份**，无上限时一天能堆到几百 MB（实测 3 份 = 442MB）。
+        /// </summary>
+        public int exeBackupKeep = 2;
+
+        /// <summary>
+        /// 日志保留天数（默认 30）：超过这个天数的 `Core\Logs\*.log` 会被清理。
+        /// 只删日志，不碰世界/备份（见 <see cref="backupKeep"/> 与 `Servers\Worlds\*.wld*`）。
+        /// </summary>
+        public int logRetentionDays = 30;
         public List<ServerProfile> serverProfiles = new();
         public List<ExternalProcessProfile> externalProcesses = new();
 
