@@ -5,6 +5,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace PGameTSManager
 {
@@ -44,16 +45,16 @@ namespace PGameTSManager
     /// <summary>单个受管服务器：指向 1.PigeonServers\&lt;服&gt;（只放 config.json + tshock\）。</summary>
     public class ServerProfile
     {
-        public string name = string.Empty;
+        [JsonProperty("服务器名称")] public string name = string.Empty;
         /// <summary>稳定机器标识；外部项目只用 id 映射服务器，不使用中文名。</summary>
-        public string id = string.Empty;
-        public string rootPath = string.Empty;
-        public string executable = "TShock.Server.exe";
-        public string arguments = string.Empty;
-        public bool enabled = true;
-        public string remark = string.Empty;
-        public List<string> plugins = new();
-        public string pluginLibrary = string.Empty;
+        [JsonProperty("标识")] public string id = string.Empty;
+        [JsonProperty("目录")] public string rootPath = string.Empty;
+        [JsonProperty("可执行文件")] public string executable = "TShock.Server.exe";
+        [JsonProperty("启动参数")] public string arguments = string.Empty;
+        [JsonProperty("启用")] public bool enabled = true;
+        [JsonProperty("备注")] public string remark = string.Empty;
+        [JsonProperty("插件")] public List<string> plugins = new();
+        [JsonProperty("插件总库")] public string pluginLibrary = string.Empty;
 
         public const string ManifestFileName = "config.json";
 
@@ -104,22 +105,22 @@ namespace PGameTSManager
 
     public class ExternalProcessProfile
     {
-        public string kind { get; set; } = "external-process";
-        public string id { get; set; } = "";
-        public string name { get; set; } = "";
-        public bool enabled { get; set; } = true;
-        public string workdir { get; set; } = "";
-        public string exe { get; set; } = "";
-        public string processName { get; set; } = "";
-        public List<string> args { get; set; } = new();
-        public List<string> stopArgs { get; set; } = new();
-        public string healthMode { get; set; } = "process";
-        public List<int> healthPorts { get; set; } = new();
-        public string healthUrl { get; set; } = "";
-        public string logDir { get; set; } = "";
-        public int logActiveSeconds { get; set; } = 300;
-        public string watchdog { get; set; } = "none";
-        public bool autoRestart { get; set; }
+        [JsonProperty("类型")] public string kind { get; set; } = "external-process";
+        [JsonProperty("标识")] public string id { get; set; } = "";
+        [JsonProperty("名称")] public string name { get; set; } = "";
+        [JsonProperty("启用")] public bool enabled { get; set; } = true;
+        [JsonProperty("工作目录")] public string workdir { get; set; } = "";
+        [JsonProperty("可执行文件")] public string exe { get; set; } = "";
+        [JsonProperty("进程名")] public string processName { get; set; } = "";
+        [JsonProperty("启动参数")] public List<string> args { get; set; } = new();
+        [JsonProperty("停止参数")] public List<string> stopArgs { get; set; } = new();
+        [JsonProperty("健康检查方式")] public string healthMode { get; set; } = "process";
+        [JsonProperty("健康端口")] public List<int> healthPorts { get; set; } = new();
+        [JsonProperty("健康地址")] public string healthUrl { get; set; } = "";
+        [JsonProperty("日志目录")] public string logDir { get; set; } = "";
+        [JsonProperty("日志活跃判定秒")] public int logActiveSeconds { get; set; } = 300;
+        [JsonProperty("看门狗")] public string watchdog { get; set; } = "none";
+        [JsonProperty("自动重启")] public bool autoRestart { get; set; }
     }
 
     public class ManagerConfig
@@ -139,65 +140,65 @@ namespace PGameTSManager
 
         // —— 旧版 TSManager 目录约定 ——
         /// <summary>世界文件目录（共享），相对程序目录。</summary>
-        public string worldDir = "Servers\\Worlds";
+        [JsonProperty("世界目录")] public string worldDir = "Servers\\Worlds";
         /// <summary>插件总库（共享），相对程序目录。</summary>
-        public string pluginDir = "Plugins";
+        [JsonProperty("插件总库")] public string pluginDir = "Plugins";
         /// <summary>各服运行沙箱目录（自动生成），相对程序目录。</summary>
-        public string runtimeDir = "Core\\_runtime";
-        public string serverDir = "Servers\\Profiles";
-        public string configFile = "config.json";
-        public string serverExecutable = "TShock.Server.exe";
+        [JsonProperty("运行沙箱目录")] public string runtimeDir = "Core\\_runtime";
+        [JsonProperty("服务器目录")] public string serverDir = "Servers\\Profiles";
+        [JsonProperty("清单文件名")] public string configFile = "config.json";
+        [JsonProperty("服务端可执行文件")] public string serverExecutable = "TShock.Server.exe";
 
         // —— 运行选项 ——
-        public bool backupBeforeStart = true;
-        public string backupDir = "Core\\Backups";
-        public string logDir = "Core\\Logs";
-        public string dataDir = "Core\\Data";
-        public string toolsDir = "Tools";
-        public int backupKeep = 10;
+        [JsonProperty("启动前备份")] public bool backupBeforeStart = true;
+        [JsonProperty("备份目录")] public string backupDir = "Core\\Backups";
+        [JsonProperty("日志目录")] public string logDir = "Core\\Logs";
+        [JsonProperty("数据目录")] public string dataDir = "Core\\Data";
+        [JsonProperty("工具目录")] public string toolsDir = "Tools";
+        [JsonProperty("备份保留数")] public int backupKeep = 10;
 
         /// <summary>
         /// 管理器**主程序**换版备份 `PGame-TSManager.exe.bak*` 的保留份数（默认 2）。
         /// ⚠ 与 <see cref="backupKeep"/> 不是一回事：那个管世界/配置备份（Core\Backups），这个只管主 exe 的换版备份。
         /// 主 exe 自包含单文件约 **147 MB/份**，无上限时一天能堆到几百 MB（实测 3 份 = 442MB）。
         /// </summary>
-        public int exeBackupKeep = 2;
+        [JsonProperty("主程序备份保留数")] public int exeBackupKeep = 2;
 
         /// <summary>
         /// 日志保留天数（默认 30）：超过这个天数的 `Core\Logs\*.log` 会被清理。
         /// 只删日志，不碰世界/备份（见 <see cref="backupKeep"/> 与 `Servers\Worlds\*.wld*`）。
         /// </summary>
-        public int logRetentionDays = 30;
-        public List<ServerProfile> serverProfiles = new();
-        public List<ExternalProcessProfile> externalProcesses = new();
+        [JsonProperty("日志保留天数")] public int logRetentionDays = 30;
+        [JsonProperty("服务器列表")] public List<ServerProfile> serverProfiles = new();
+        [JsonProperty("外部进程")] public List<ExternalProcessProfile> externalProcesses = new();
 
         /// <summary>运行时母本目录；留空 = 程序目录（exe/bin/i18n/runtimes/x64/GeoIP.dat 所在处）。</summary>
-        public string sharedRuntimeDir = "Core";
+        [JsonProperty("运行时母本目录")] public string sharedRuntimeDir = "Core";
         /// <summary>启动前按各服 config.json 从插件总库同步插件。</summary>
-        public bool syncPluginsOnStart = true;
+        [JsonProperty("启动前同步插件")] public bool syncPluginsOnStart = true;
         /// <summary>未列出的插件移入 ServerPlugins.disabled（不删除）。</summary>
-        public bool prunePlugins = true;
+        [JsonProperty("停用未列出插件")] public bool prunePlugins = true;
         /// <summary>被停用插件的子目录名。</summary>
-        public string disabledPluginDir = "ServerPlugins.disabled";
+        [JsonProperty("停用插件目录名")] public string disabledPluginDir = "ServerPlugins.disabled";
         /// <summary>true = 每台服务器另开独立可见控制台窗口；false（默认）= 在管理器内运行。</summary>
-        public bool showServerWindow = false;
+        [JsonProperty("每服独立窗口")] public bool showServerWindow = false;
 
         // —— 空服内存压缩：不关端口，只压缩工作集，玩家首次进入不受影响 ——
         /// <summary>是否在服务器无人时自动压缩工作集。</summary>
-        public bool idleMemoryTrimEnabled = true;
+        [JsonProperty("空闲内存整理")] public bool idleMemoryTrimEnabled = true;
         /// <summary>连续无人多少分钟后执行第一次压缩。</summary>
-        public int idleMemoryTrimMinutes = 15;
+        [JsonProperty("内存整理触发分钟")] public int idleMemoryTrimMinutes = 15;
         /// <summary>两次压缩之间的最小间隔分钟数。</summary>
-        public int idleMemoryTrimCooldownMinutes = 30;
+        [JsonProperty("内存整理冷却分钟")] public int idleMemoryTrimCooldownMinutes = 30;
         /// <summary>工作集低于该值时不再压缩，避免无意义操作。</summary>
-        public int idleMemoryTrimMinWorkingSetMB = 256;
+        [JsonProperty("内存整理最小工作集MB")] public int idleMemoryTrimMinWorkingSetMB = 256;
 
         /// <summary>
         /// 容量采样：每隔 capacitySampleSeconds 秒，把每服的 (人数, CPU%, 工作集, 私有) 追加到
         /// Core\Data\capacity-samples.csv —— 用于拟合「人数 × 单核占用」曲线。
         /// </summary>
-        public bool capacitySampleEnabled = true;
-        public int capacitySampleSeconds = 60;
+        [JsonProperty("容量采样")] public bool capacitySampleEnabled = true;
+        [JsonProperty("容量采样间隔秒")] public int capacitySampleSeconds = 60;
 
         /// <summary>
         /// 空服周期保存：TShock 自己的自动保存**只在有人在线时**才跑（实测：有人≈每 10 分钟；
@@ -205,70 +206,209 @@ namespace PGameTSManager
         /// 出生点.sec3）→ 崩溃/断电后这些改动会丢。这里每隔 periodicSaveMinutes 分钟，
         /// 对「正在运行且当前 0 人在线」的服发一次 /save 兜底。
         /// </summary>
-        public bool periodicSaveEnabled = true;
-        public int periodicSaveMinutes = 15;
+        [JsonProperty("周期保存")] public bool periodicSaveEnabled = true;
+        [JsonProperty("周期保存间隔分钟")] public int periodicSaveMinutes = 15;
         /// <summary>true = 只保存 0 人在线的服（有人在线时交给 TShock 自己的自动保存）。</summary>
-        public bool periodicSaveOnlyWhenEmpty = true;
+        [JsonProperty("仅空服周期保存")] public bool periodicSaveOnlyWhenEmpty = true;
         /// <summary>
         /// 最后一名玩家离线时立即补存一次（默认开）。
         /// TShock 的自动保存只在有人在线时按 10 分钟跑，人一走就停 ——
         /// 「玩家刚走 → 下一个人进来之前」这段时间的世界改动否则不会落盘。
         /// </summary>
-        public bool saveOnLastPlayerLeave = true;
+        [JsonProperty("离场保存")] public bool saveOnLastPlayerLeave = true;
 
         // —— 本地控制 API（默认关闭；个人版 overlay 才开启） ——
-        public bool controlApiEnabled = false;
-        public string controlApiHost = "127.0.0.1";
-        public int controlApiPort = 8765;
-        public string controlApiToken = "";
-        public int controlApiEventBuffer = 512;
+        [JsonProperty("控制API开关")] public bool controlApiEnabled = false;
+        [JsonProperty("控制API地址")] public string controlApiHost = "127.0.0.1";
+        [JsonProperty("控制API端口")] public int controlApiPort = 8765;
+        [JsonProperty("控制API令牌")] public string controlApiToken = "";
+        [JsonProperty("控制API事件缓冲")] public int controlApiEventBuffer = 512;
 
         /// <summary>
         /// 「全部启动」是否按顺序逐台启动：上一台真正就绪（端口在监听）后再起下一台。
         /// 三台同时读世界会互相抢 CPU / 磁盘，表现就是界面卡很久才起来。
         /// </summary>
-        public bool startAllSequential = true;
+        [JsonProperty("顺序启动")] public bool startAllSequential = true;
 
         // —— 看门狗：服务器异常退出后自动拉起 ——
         /// <summary>是否开启看门狗（异常退出自动重启）。</summary>
-        public bool watchdogEnabled = true;
+        [JsonProperty("看门狗开关")] public bool watchdogEnabled = true;
         /// <summary>连续自动重启次数上限，超过就放弃并告警（防止无限崩溃循环）。</summary>
-        public int watchdogMaxRestarts = 3;
+        [JsonProperty("看门狗最大重启次数")] public int watchdogMaxRestarts = 3;
         /// <summary>自动重启前等待秒数（给端口/文件句柄一点释放时间）。</summary>
-        public int watchdogRestartDelaySeconds = 8;
+        [JsonProperty("看门狗重启延迟秒")] public int watchdogRestartDelaySeconds = 8;
         /// <summary>运行超过这个秒数算「稳定」，重启计数清零（偶尔崩一次不会累积到上限）。</summary>
-        public int watchdogStableSeconds = 300;
+        [JsonProperty("看门狗稳定判定秒")] public int watchdogStableSeconds = 300;
         /// <summary>端口/REST 连续健康检查失败多少次后判定为死服并重启。</summary>
-        public int watchdogHealthFailureThreshold = 3;
+        [JsonProperty("看门狗健康失败阈值")] public int watchdogHealthFailureThreshold = 3;
         /// <summary>启动后的看门狗保护期，避免世界加载期间误判。</summary>
-        public int watchdogStartupGraceSeconds = 30;
+        [JsonProperty("看门狗启动宽限秒")] public int watchdogStartupGraceSeconds = 30;
         /// <summary>端口持续异常多少秒后才允许判定死服，避免热重载或换图时短暂断流误判。</summary>
-        public int watchdogUnhealthySeconds = 120;
+        [JsonProperty("看门狗不健康判定秒")] public int watchdogUnhealthySeconds = 120;
         /// <summary>执行 /hr、/reload、/world 等维护命令后，暂停健康检查的秒数。</summary>
-        public int watchdogMaintenanceSuppressSeconds = 180;
+        [JsonProperty("看门狗维护抑制秒")] public int watchdogMaintenanceSuppressSeconds = 180;
         /// <summary>世界缺失触发自动建图时，看门狗保护窗口秒数；小/中/大图另有最低值。</summary>
-        public int watchdogWorldBuildSuppressSeconds = 600;
+        [JsonProperty("看门狗建图抑制秒")] public int watchdogWorldBuildSuppressSeconds = 600;
         /// <summary>是否把连续致命日志异常作为死服重启依据。</summary>
-        public bool watchdogLogErrorRestartEnabled = true;
+        [JsonProperty("看门狗日志报错重启")] public bool watchdogLogErrorRestartEnabled = true;
         /// <summary>窗口期内出现多少条致命日志后触发重启。</summary>
-        public int watchdogLogErrorThreshold = 3;
+        [JsonProperty("日志报错阈值")] public int watchdogLogErrorThreshold = 3;
         /// <summary>致命日志统计窗口秒数。</summary>
-        public int watchdogLogErrorWindowSeconds = 60;
+        [JsonProperty("日志报错窗口秒")] public int watchdogLogErrorWindowSeconds = 60;
 
         // —— 告警：异常/掉线时调用外部上报脚本 ——
         // Core 不内置私人脚本路径与群号：三项都留空 = 告警关闭。
         /// <summary>是否启用外部告警。</summary>
-        public bool alertEnabled = false;
+        [JsonProperty("告警开关")] public bool alertEnabled = false;
         /// <summary>上报脚本路径（相对可执行文件目录或绝对路径）；留空 = 不告警。</summary>
-        public string alertScript = "";
+        [JsonProperty("告警脚本")] public string alertScript = "";
         /// <summary>兼容旧配置：单个上报群号。</summary>
-        public long alertGroupId = 0;
+        [JsonProperty("告警群号_旧")] public long alertGroupId = 0;
         /// <summary>上报到的群号列表；未配置时回退到 alertGroupId。</summary>
-        public List<long> alertGroupIds = new();
+        [JsonProperty("告警群号列表")] public List<long> alertGroupIds = new();
         /// <summary>同类告警最小间隔秒数（防刷屏）。</summary>
-        public int alertMinIntervalSeconds = 60;
+        [JsonProperty("告警最小间隔秒")] public int alertMinIntervalSeconds = 60;
         /// <summary>顺序启动时，单台服务器等待「就绪」的最长秒数（超时就跳过，继续下一台）。</summary>
-        public int startReadyTimeoutSeconds = 240;
+        [JsonProperty("就绪超时秒")] public int startReadyTimeoutSeconds = 240;
+
+        // ————————————————————————————————————————————————————————————————
+        // 旧版英文键 → 中文键 迁移（2026-10-12 汉化）
+        //   为什么需要：老部署的 config.json 是英文键；改了 [JsonProperty] 之后若不做迁移，
+        //   反序列化会全部落默认值 —— 尤其是 控制API令牌 会丢（Control API / Bot / FixTools 全依赖它）。
+        //   策略：加载时先把旧键名改写为中文，再反序列化；改写成功就把原文件备份成
+        //   config.json.bak-<时间戳> 并把新格式写回。**幂等**：已是中文键则原样通过。
+        // ————————————————————————————————————————————————————————————————
+        private static readonly Dictionary<string, string> LegacyManagerKeys = new(StringComparer.Ordinal)
+        {
+            ["worldDir"] = "世界目录",
+            ["pluginDir"] = "插件总库",
+            ["runtimeDir"] = "运行沙箱目录",
+            ["serverDir"] = "服务器目录",
+            ["configFile"] = "清单文件名",
+            ["serverExecutable"] = "服务端可执行文件",
+            ["backupBeforeStart"] = "启动前备份",
+            ["backupDir"] = "备份目录",
+            ["logDir"] = "日志目录",
+            ["dataDir"] = "数据目录",
+            ["toolsDir"] = "工具目录",
+            ["backupKeep"] = "备份保留数",
+            ["exeBackupKeep"] = "主程序备份保留数",
+            ["logRetentionDays"] = "日志保留天数",
+            ["serverProfiles"] = "服务器列表",
+            ["externalProcesses"] = "外部进程",
+            ["sharedRuntimeDir"] = "运行时母本目录",
+            ["syncPluginsOnStart"] = "启动前同步插件",
+            ["prunePlugins"] = "停用未列出插件",
+            ["disabledPluginDir"] = "停用插件目录名",
+            ["showServerWindow"] = "每服独立窗口",
+            ["idleMemoryTrimEnabled"] = "空闲内存整理",
+            ["idleMemoryTrimMinutes"] = "内存整理触发分钟",
+            ["idleMemoryTrimCooldownMinutes"] = "内存整理冷却分钟",
+            ["idleMemoryTrimMinWorkingSetMB"] = "内存整理最小工作集MB",
+            ["capacitySampleEnabled"] = "容量采样",
+            ["capacitySampleSeconds"] = "容量采样间隔秒",
+            ["periodicSaveEnabled"] = "周期保存",
+            ["periodicSaveMinutes"] = "周期保存间隔分钟",
+            ["periodicSaveOnlyWhenEmpty"] = "仅空服周期保存",
+            ["saveOnLastPlayerLeave"] = "离场保存",
+            ["controlApiEnabled"] = "控制API开关",
+            ["controlApiHost"] = "控制API地址",
+            ["controlApiPort"] = "控制API端口",
+            ["controlApiToken"] = "控制API令牌",
+            ["controlApiEventBuffer"] = "控制API事件缓冲",
+            ["startAllSequential"] = "顺序启动",
+            ["startReadyTimeoutSeconds"] = "就绪超时秒",
+            ["watchdogEnabled"] = "看门狗开关",
+            ["watchdogMaxRestarts"] = "看门狗最大重启次数",
+            ["watchdogRestartDelaySeconds"] = "看门狗重启延迟秒",
+            ["watchdogStableSeconds"] = "看门狗稳定判定秒",
+            ["watchdogHealthFailureThreshold"] = "看门狗健康失败阈值",
+            ["watchdogStartupGraceSeconds"] = "看门狗启动宽限秒",
+            ["watchdogUnhealthySeconds"] = "看门狗不健康判定秒",
+            ["watchdogMaintenanceSuppressSeconds"] = "看门狗维护抑制秒",
+            ["watchdogWorldBuildSuppressSeconds"] = "看门狗建图抑制秒",
+            ["watchdogLogErrorRestartEnabled"] = "看门狗日志报错重启",
+            ["watchdogLogErrorThreshold"] = "日志报错阈值",
+            ["watchdogLogErrorWindowSeconds"] = "日志报错窗口秒",
+            ["alertEnabled"] = "告警开关",
+            ["alertScript"] = "告警脚本",
+            ["alertGroupId"] = "告警群号_旧",
+            ["alertGroupIds"] = "告警群号列表",
+            ["alertMinIntervalSeconds"] = "告警最小间隔秒"
+        };
+
+        /// <summary>服务器列表[] 里每条的老键名。</summary>
+        private static readonly Dictionary<string, string> LegacyProfileKeys = new(StringComparer.Ordinal)
+        {
+            ["name"] = "服务器名称",
+            ["id"] = "标识",
+            ["rootPath"] = "目录",
+            ["executable"] = "可执行文件",
+            ["arguments"] = "启动参数",
+            ["enabled"] = "启用",
+            ["remark"] = "备注",
+            ["plugins"] = "插件",
+            ["pluginLibrary"] = "插件总库"
+        };
+
+        /// <summary>外部进程[] 里每条的老键名。</summary>
+        private static readonly Dictionary<string, string> LegacyExternalKeys = new(StringComparer.Ordinal)
+        {
+            ["kind"] = "类型",
+            ["id"] = "标识",
+            ["name"] = "名称",
+            ["enabled"] = "启用",
+            ["workdir"] = "工作目录",
+            ["exe"] = "可执行文件",
+            ["processName"] = "进程名",
+            ["args"] = "启动参数",
+            ["stopArgs"] = "停止参数",
+            ["healthMode"] = "健康检查方式",
+            ["healthPorts"] = "健康端口",
+            ["healthUrl"] = "健康地址",
+            ["logDir"] = "日志目录",
+            ["logActiveSeconds"] = "日志活跃判定秒",
+            ["watchdog"] = "看门狗",
+            ["autoRestart"] = "自动重启"
+        };
+
+        /// <summary>
+        /// 把旧版英文键名的 config.json 文本改写成中文键名；已是中文（或无法解析）时原样返回。
+        /// </summary>
+        public static string MigrateLegacyKeys(string json)
+        {
+            JObject root;
+            try { root = JObject.Parse(json); }
+            catch { return json; }
+
+            var changed = false;
+            var result = new JObject();
+            foreach (var prop in root.Properties().ToList())
+            {
+                var name = prop.Name;
+                if (LegacyManagerKeys.TryGetValue(name, out var cn)) { name = cn; changed = true; }
+
+                if (name == "服务器列表" && prop.Value is JArray profiles)
+                    foreach (var item in profiles.OfType<JObject>().ToList()) RenameKeys(item, LegacyProfileKeys, ref changed);
+                else if (name == "外部进程" && prop.Value is JArray externals)
+                    foreach (var item in externals.OfType<JObject>().ToList()) RenameKeys(item, LegacyExternalKeys, ref changed);
+
+                result[name] = prop.Value;
+            }
+            return changed ? result.ToString(Formatting.Indented) : json;
+        }
+
+        private static void RenameKeys(JObject obj, Dictionary<string, string> map, ref bool changed)
+        {
+            foreach (var p in obj.Properties().ToList())
+            {
+                if (!map.TryGetValue(p.Name, out var cn)) continue;
+                var value = p.Value;
+                p.Remove();
+                obj[cn] = value;
+                changed = true;
+            }
+        }
 
         private static ManagerConfig? _instance;
         public static ManagerConfig Instance => _instance ??= LoadConfig() ?? new ManagerConfig();
@@ -280,7 +420,19 @@ namespace PGameTSManager
             var path = ConfigFilePath;
             if (File.Exists(path))
             {
-                try { return JsonConvert.DeserializeObject<ManagerConfig>(File.ReadAllText(path)); }
+                try
+                {
+                    var raw = File.ReadAllText(path);
+                    var migrated = MigrateLegacyKeys(raw);      // 旧英文键 → 中文键（幂等）
+                    var cfg = JsonConvert.DeserializeObject<ManagerConfig>(migrated);
+                    if (!ReferenceEquals(migrated, raw) && !string.Equals(migrated, raw, StringComparison.Ordinal))
+                    {
+                        // 迁移成功：原文件留一份备份，再把中文键格式写回（下次启动就走快路径）
+                        try { File.Copy(path, path + ".bak-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"), true); } catch { }
+                        try { File.WriteAllText(path, migrated); } catch { }
+                    }
+                    return cfg;
+                }
                 catch { return new ManagerConfig(); }
             }
             var res = new ManagerConfig();

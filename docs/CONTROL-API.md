@@ -7,15 +7,19 @@
 
 ```json
 {
-  "controlApiEnabled": true,
-  "controlApiHost": "127.0.0.1",
-  "controlApiPort": 8765,
-  "controlApiToken": "",
-  "controlApiEventBuffer": 512
+  "控制API开关": true,
+  "控制API地址": "127.0.0.1",
+  "控制API端口": 8765,
+  "控制API令牌": "",
+  "控制API事件缓冲": 512
 }
 ```
 
-`controlApiToken` 为空时由 TSM 首次启动生成并写回运行端 `config.json`。不要把 token 提交到 Git。
+⚠ **2026-10-12 起管理器 `config.json` 全部使用中文键**（旧英文键在 TSM 首次启动时**自动迁移**，原文件备份成
+`config.json.bak-<时间戳>`，取值不变）。完整中英对照表见 `docs\管理器配置-中文键与迁移.md`。
+
+`控制API令牌`（旧 `controlApiToken`）为空时由 TSM 首次启动生成并写回运行端 `config.json`；不要把 token 提交到 Git。
+**外部脚本读取时请用中文键**（TSM 侧运维脚本已改成"中文优先、英文兜底"）。
 
 ## 端点
 

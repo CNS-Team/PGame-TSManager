@@ -42,21 +42,22 @@ try {
         Remove-Item -LiteralPath $privateMigrationTool -Force
     }
     $template = [ordered]@{
-        backupBeforeStart = $true
-        backupDir = 'Core\Backups'
-        backupKeep = 10
-        serverDir = 'Servers\Profiles'
-        pluginDir = 'Plugins'
-        runtimeDir = 'Core\_runtime'
-        sharedRuntimeDir = 'Core'
-        worldDir = 'Servers\Worlds'
-        logDir = 'Core\Logs'
-        dataDir = 'Core\Data'
-        toolsDir = 'Tools'
-        startAllSequential = $true
-        watchdogEnabled = $true
-        alertEnabled = $true
-        serverProfiles = @()
+        # ⚠ 2026-10-12 起管理器 config.json 使用**中文键**（打包出的模板同样）
+        '启动前备份' = $true
+        '备份目录' = 'Core\Backups'
+        '备份保留数' = 10
+        '服务器目录' = 'Servers\Profiles'
+        '插件总库' = 'Plugins'
+        '运行沙箱目录' = 'Core\_runtime'
+        '运行时母本目录' = 'Core'
+        '世界目录' = 'Servers\Worlds'
+        '日志目录' = 'Core\Logs'
+        '数据目录' = 'Core\Data'
+        '工具目录' = 'Tools'
+        '顺序启动' = $true
+        '看门狗开关' = $true
+        '告警开关' = $true
+        '服务器列表' = @()
     }
     $template | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stage 'config.json') -Encoding UTF8
     $readme = Join-Path $stage '部署说明.txt'

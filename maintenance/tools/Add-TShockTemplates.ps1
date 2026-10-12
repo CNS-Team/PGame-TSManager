@@ -100,28 +100,29 @@ $config = if (Test-Path -LiteralPath $configPath) {
     [pscustomobject]@{}
 }
 
-Set-Property $config 'backupBeforeStart' $true
-Set-Property $config 'backupDir' 'Core\Backups'
-Set-Property $config 'backupKeep' 10
-Set-Property $config 'pluginLibrary' 'Plugins'
-Set-Property $config 'syncPluginsOnStart' $true
-Set-Property $config 'prunePlugins' $true
-Set-Property $config 'disabledPluginDir' 'ServerPlugins.disabled'
-Set-Property $config 'serverProfiles' @($profiles)
-Set-Property $config 'showServerWindow' $false
-Set-Property $config 'worldDir' 'Servers\Worlds'
-Set-Property $config 'pluginDir' 'Plugins'
-Set-Property $config 'runtimeDir' 'Core\_runtime'
-Set-Property $config 'serverDir' 'Servers\Profiles'
-Set-Property $config 'configFile' 'config.json'
-Set-Property $config 'serverExecutable' 'TShock.Server.exe'
-Set-Property $config 'sharedRuntimeDir' 'Core'
-Set-Property $config 'logDir' 'Core\Logs'
-Set-Property $config 'dataDir' 'Core\Data'
-Set-Property $config 'toolsDir' 'Tools'
-Set-Property $config 'startAllSequential' $true
-Set-Property $config 'watchdogEnabled' $true
-Set-Property $config 'alertEnabled' $true
+# ⚠ 2026-10-12 起管理器 config.json 使用**中文键**（旧英文键由管理器启动时自动迁移）
+Set-Property $config '启动前备份' $true
+Set-Property $config '备份目录' 'Core\Backups'
+Set-Property $config '备份保留数' 10
+Set-Property $config '插件总库' 'Plugins'
+Set-Property $config '启动前同步插件' $true
+Set-Property $config '停用未列出插件' $true
+Set-Property $config '停用插件目录名' 'ServerPlugins.disabled'
+Set-Property $config '服务器列表' @($profiles)
+Set-Property $config '每服独立窗口' $false
+Set-Property $config '世界目录' 'Servers\Worlds'
+Set-Property $config '插件总库' 'Plugins'
+Set-Property $config '运行沙箱目录' 'Core\_runtime'
+Set-Property $config '服务器目录' 'Servers\Profiles'
+Set-Property $config '清单文件名' 'config.json'
+Set-Property $config '服务端可执行文件' 'TShock.Server.exe'
+Set-Property $config '运行时母本目录' 'Core'
+Set-Property $config '日志目录' 'Core\Logs'
+Set-Property $config '数据目录' 'Core\Data'
+Set-Property $config '工具目录' 'Tools'
+Set-Property $config '顺序启动' $true
+Set-Property $config '看门狗开关' $true
+Set-Property $config '告警开关' $true
 
 [IO.File]::WriteAllText($configPath, ($config | ConvertTo-Json -Depth 12), [Text.UTF8Encoding]::new($false))
 

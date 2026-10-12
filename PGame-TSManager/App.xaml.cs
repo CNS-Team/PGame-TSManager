@@ -409,6 +409,11 @@ namespace PGameTSManager
             if (e.Args.Any(a => string.Equals(a, "--send", StringComparison.OrdinalIgnoreCase)))
             { Shutdown(Cli.Send(e.Args)); return; }
 
+            // 配置自检（无界面）：把加载后的 config.json 写成 configdump.txt（令牌打码），
+            // 用来核对「英文键迁移到中文键后取值有没有变」——部署前后各跑一次对比即可。
+            if (e.Args.Any(a => string.Equals(a, "--dumpconfig", StringComparison.OrdinalIgnoreCase)))
+            { Shutdown(Cli.DumpConfig()); return; }
+
             if (!EnsureSingleInstance())
             {
                 Shutdown(0);

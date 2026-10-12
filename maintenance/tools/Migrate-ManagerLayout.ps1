@@ -119,19 +119,20 @@ if ($IncludeSourceDirectories) {
 $configPath = Join-Path $root 'config.json'
 if (Test-Path -LiteralPath $configPath) {
     $config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    Set-Property $config 'sharedRuntimeDir' 'Core'
-    Set-Property $config 'worldDir' 'Servers\Worlds'
-    Set-Property $config 'pluginDir' 'Plugins'
-    Set-Property $config 'runtimeDir' 'Core\_runtime'
-    Set-Property $config 'serverDir' 'Servers\Profiles'
-    Set-Property $config 'backupDir' 'Core\Backups'
-    Set-Property $config 'logDir' 'Core\Logs'
-    Set-Property $config 'dataDir' 'Core\Data'
-    Set-Property $config 'toolsDir' 'Tools'
+    # ⚠ 2026-10-12 起管理器 config.json 使用**中文键**（旧英文键由管理器启动时自动迁移，见 ManagerConfig.MigrateLegacyKeys）
+    Set-Property $config '运行时母本目录' 'Core'
+    Set-Property $config '世界目录' 'Servers\Worlds'
+    Set-Property $config '插件总库' 'Plugins'
+    Set-Property $config '运行沙箱目录' 'Core\_runtime'
+    Set-Property $config '服务器目录' 'Servers\Profiles'
+    Set-Property $config '备份目录' 'Core\Backups'
+    Set-Property $config '日志目录' 'Core\Logs'
+    Set-Property $config '数据目录' 'Core\Data'
+    Set-Property $config '工具目录' 'Tools'
 
-    foreach ($profile in @($config.serverProfiles)) {
+    foreach ($profile in @($config.服务器列表)) {
         if ($null -eq $profile) { continue }
-        $profile.rootPath = [string]$profile.rootPath -replace '1\.PigeonServers', 'Servers\Profiles'
+        $profile.目录 = [string]$profile.目录 -replace '1\.PigeonServers', 'Servers\Profiles'
     }
 
     if ($DryRun) {
