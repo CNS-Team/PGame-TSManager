@@ -369,12 +369,20 @@ TSM 每 ~30s 经 WMI 扫描 `TShock.Server.exe`，凡是**不属于任何 TSM �
 
 ```json
 {
-  "periodicSaveEnabled": true,          // 0 人服周期补存
-  "periodicSaveMinutes": 15,            // 周期（分钟）
-  "periodicSaveOnlyWhenEmpty": true,    // 有人在线时交给 TShock 自己的 10 分钟自动保存
-  "saveOnLastPlayerLeave": true         // 最后一名玩家离线立刻补存一次
+  "周期保存": true,                     // 0 人服周期补存（中文键；2026-10-13 汉化后）
+  "周期保存间隔分钟": 15,               // 周期（分钟）
+  "仅空服周期保存": true,               // 有人在线时交给 TShock 自己的 10 分钟自动保存
+  "离场保存": false                     // 最后一名玩家离线立刻补存（本舰队已按用户要求设 false）
 }
 ```
+
+## 附属只读端点：`/data/users/uuid-list`（PGameAPI，2026-10-13 起）
+
+`GET http://127.0.0.1:<restPort>/data/users/uuid-list?token=<该服 Rest外部应用令牌>`
+
+- 返回全量账号→UUID 清单：`{"status":"200","users":[{"username":…,"uuid":…,"group":…}, …]}`（**只读**）；
+- 用途：Bot「UUID 全量对账」的数据源（默认 30 分钟一轮；权威服=流光城；配置项 `UUID全量对账分钟` / `UUID对账权威服` / `UUID对账补建账号`）；
+- `UuidEventStore` 已内建**磁盘 mtime/大小变更自动重读** —— 插件热重载后不会再有"缓存不刷新"导致的静默断流（2026-10-13 事故的代码级防护）。
 
 日志检索示例（PowerShell）：
 
