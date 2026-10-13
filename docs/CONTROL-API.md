@@ -209,6 +209,7 @@ TSM 是 `server.properties` 和 `Servers\Worlds\*.wld` 的唯一写入者。
 - TShock 用**影子加载** `Assembly.Load(byte[], byte[])`（`TerrariaServer.dll::ServerApi.LoadPlugins`、`HotReload.Core::LoadPluginFromDisk`），**运行中的 ServerPlugins DLL 不会被锁**，可随时覆盖。
 - `/hr load <插件>` **会重新读盘**：把沙箱 DLL 换成坏字节 → 报 `Bad IL format`；换回好文件 → 正常加载。
 - 所以插件热升级流程 = `POST .../syncplugins` → `/hr load <插件>`，**无需重启**。
+- ⚠ **只把 DLL 放进总库 ≠ 沙箱已更新**：沙箱 `ServerPlugins` 是独立副本，**跳过 `syncplugins` 直接 `/hr load` 会一直加载沙箱里的旧 DLL**（表现为"新功能全不生效"；2026-10-13 由 19 会话实测踩坑确认）。正确链路三件套：`放总库 → POST .../syncplugins → /hr load（或 .../plugins/reload）`。
 - `PGame-TSManager.exe --syncplugins` 已同步修正：除根目录镜像外，也把总库同步进每个沙箱。
 
 ### 结构化插件热更
