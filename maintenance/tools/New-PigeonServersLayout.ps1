@@ -164,8 +164,8 @@ $mgr = [ordered]@{
     backupDir          = 'Backups'
     backupKeep         = 10
     pluginLibrary      = 'Plugins'
-    syncPluginsOnStart = $true
-    prunePlugins       = $true
+    syncPluginsOnStart = $false
+    prunePlugins       = $false
     disabledPluginDir  = 'ServerPlugins.disabled'
     serverProfiles     = $profiles
 }

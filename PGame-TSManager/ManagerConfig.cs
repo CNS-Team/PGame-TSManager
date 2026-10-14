@@ -176,16 +176,16 @@ namespace PGameTSManager
         /// ② 单文件自包含部署下，程序目录里另一次发布模式残留的 `PGame-TSManager.dll/.deps.json/.runtimeconfig.json`。
         /// 总库没有同名的停用插件、以及非单文件部署，一律不删（详见 ManagerHousekeeping）。
         /// </summary>
-        [JsonProperty("清理陈旧残留")] public bool cleanupStaleArtifacts = true;
+        [JsonProperty("清理陈旧残留")] public bool cleanupStaleArtifacts = false; // 2026-10-15 起默认关闭（本舰队运维模型精简口径）
         [JsonProperty("服务器列表")] public List<ServerProfile> serverProfiles = new();
         [JsonProperty("外部进程")] public List<ExternalProcessProfile> externalProcesses = new();
 
         /// <summary>运行时母本目录；留空 = 程序目录（exe/bin/i18n/runtimes/x64/GeoIP.dat 所在处）。</summary>
         [JsonProperty("运行时母本目录")] public string sharedRuntimeDir = "Core";
         /// <summary>启动前按各服 config.json 从插件总库同步插件。</summary>
-        [JsonProperty("启动前同步插件")] public bool syncPluginsOnStart = true;
+        [JsonProperty("启动前同步插件")] public bool syncPluginsOnStart = false; // 2026-10-15 起默认关闭：改插件=scp+reload/重启，无启动时自动搬运
         /// <summary>未列出的插件移入 ServerPlugins.disabled（不删除）。</summary>
-        [JsonProperty("停用未列出插件")] public bool prunePlugins = true;
+        [JsonProperty("停用未列出插件")] public bool prunePlugins = false; // 2026-10-15 起默认关闭：不再自动搬 ServerPlugins.disabled
         /// <summary>被停用插件的子目录名。</summary>
         [JsonProperty("停用插件目录名")] public string disabledPluginDir = "ServerPlugins.disabled";
         /// <summary>true = 每台服务器另开独立可见控制台窗口；false（默认）= 在管理器内运行。</summary>
@@ -215,7 +215,7 @@ namespace PGameTSManager
         /// 对「正在运行且当前 0 人在线」的服发一次 /save 兜底。
         /// </summary>
         [JsonProperty("周期保存")] public bool periodicSaveEnabled = true;
-        [JsonProperty("周期保存间隔分钟")] public int periodicSaveMinutes = 15;
+        [JsonProperty("周期保存间隔分钟")] public int periodicSaveMinutes = 180; // 2026-10-15 起默认 180（3 小时/次，仅空服补存）
         /// <summary>true = 只保存 0 人在线的服（有人在线时交给 TShock 自己的自动保存）。</summary>
         [JsonProperty("仅空服周期保存")] public bool periodicSaveOnlyWhenEmpty = true;
         /// <summary>
@@ -223,7 +223,7 @@ namespace PGameTSManager
         /// TShock 的自动保存只在有人在线时按 10 分钟跑，人一走就停 ——
         /// 「玩家刚走 → 下一个人进来之前」这段时间的世界改动否则不会落盘。
         /// </summary>
-        [JsonProperty("离场保存")] public bool saveOnLastPlayerLeave = true;
+        [JsonProperty("离场保存")] public bool saveOnLastPlayerLeave = false; // 2026-10-15 起默认关闭（对齐本舰队 10-13 起的口径）
 
         // —— 本地控制 API（默认关闭；个人版 overlay 才开启） ——
         [JsonProperty("控制API开关")] public bool controlApiEnabled = false;
