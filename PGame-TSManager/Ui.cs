@@ -864,7 +864,8 @@ namespace PGameTSManager
             _cfg.MakeDirectories();
 
             _serverCombo = Ui.Combo();
-            _serverCombo.Width = 290;
+            _serverCombo.Width = 220;
+            _serverCombo.MinWidth = 180;
             _serverCombo.PlaceholderText = "选择服务器";
             _serverCombo.ItemTemplate = Ui.Template<ServerContainer>(ServerComboItem);
             _serverCombo.SelectionChanged += ServerSelectionChanged;
@@ -919,8 +920,8 @@ namespace PGameTSManager
             _stopButton = Ui.Btn("停止", StopCurrent, "danger", 64, 30);
             _startAllButton = Ui.Btn("全部启动", () => _ = StartAllSequentialAsync(), null, 82, 30);
             _stopAllButton = Ui.Btn("全部停止", () => _ = StopAllAsync(), "danger", 82, 30);
-            _consoleNav = Ui.Btn("控制台", () => ShowWorkspace(false), "nav nav-active", 72, 30);
-            _operationsNav = Ui.Btn("运维中心", () => ShowWorkspace(true), "nav", 80, 30);
+            _consoleNav = Ui.Btn("控制台", () => ShowWorkspace(false), "nav nav-active", 64, 30);
+            _operationsNav = Ui.Btn("运维中心", () => ShowWorkspace(true), "nav", 72, 30);
             _maximizeIcon = new ShapePath
             {
                 Width = 12,
@@ -1154,7 +1155,7 @@ namespace PGameTSManager
         private Control BuildHeader()
         {
             var header = Ui.Grid("*", "Auto,*,Auto");
-            header.Margin = new Thickness(14, 0);
+            header.Margin = new Thickness(10, 0);
             header.Background = UiTheme.Surface;
 
             var brand = Ui.H(
@@ -1177,12 +1178,13 @@ namespace PGameTSManager
                 )
             );
             brand.Spacing = 10;
+            brand.Margin = new Thickness(0, 0, 10, 0);
             brand.VerticalAlignment = VerticalAlignment.Center;
             Ui.Place(brand, 0, 0);
             header.Children.Add(brand);
 
             var center = Ui.H(_serverCombo, _consoleNav, _operationsNav);
-            center.Spacing = 8;
+            center.Spacing = 6;
             center.HorizontalAlignment = HorizontalAlignment.Center;
             center.VerticalAlignment = VerticalAlignment.Center;
             Ui.Place(center, 0, 1);
