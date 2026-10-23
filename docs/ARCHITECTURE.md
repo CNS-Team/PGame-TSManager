@@ -1,7 +1,7 @@
 # PGame-TSManager 架构边界
 
 > 生效日期：2026-10-08
-> 适用仓库：`Pigeon-X/PGame-TSManager`（通用 Core）、`Pigeon-X/PGame-TSManager-Personal`（个人 overlay）
+> 适用仓库：`CNS-Team/PGame-TSManager`（通用 Core）、`Pigeon-X/PGame-TSManager-Personal`（个人 overlay）
 
 ---
 
@@ -32,7 +32,7 @@
 
 | 层 | 仓库 | 内容 |
 | --- | --- | --- |
-| Core | `Pigeon-X/PGame-TSManager` | 通用管理器、维护工具、TShock 模板、扩展点 |
+| Core | `CNS-Team/PGame-TSManager` | 通用管理器、维护工具、TShock 模板、扩展点 |
 | Personal | `Pigeon-X/PGame-TSManager-Personal` | `overlay/`：私人服务器配置、私人插件、Bot / 维度 / RPG 对接内容 |
 | 版本锚点 | Personal `core.lock.json` | 锁定所使用的 Core 提交 |
 | 业务插件 | PGameAPI / PigeonRPG / Dimensions / PigeonBot 等各自仓库 | 通过 REST / JSON / 事件与控制面交互 |

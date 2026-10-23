@@ -71,7 +71,7 @@ if ($SkipTShockRuntime) {
 
 Step "3/6 生成使用说明与更新说明"
 & (Join-Path $tools 'New-PackageExtras.ps1') -OutputDirectory $extrasDir `
-    -Version $version -Commit $commit -RunNumber $runNumber -Repository 'Pigeon-X/PGame-TSManager'
+    -Version $version -Commit $commit -RunNumber $runNumber -Repository 'CNS-Team/PGame-TSManager'
 
 Step "4/6 打包 source / template / universal"
 & (Join-Path $tools 'New-SourceBundle.ps1') -RepositoryRoot $root -OutputPath $sourceZip

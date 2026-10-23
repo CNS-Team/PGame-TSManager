@@ -11,12 +11,14 @@
 
 ## 为什么
 
-1. Pigeon-X 组织 Free 计划 **Actions 存储配额 0.5GB**（Artifacts + Caches + Release 资产共用），
+1. GitHub 组织 Free 计划的 **Actions 存储配额 0.5GB**（Artifacts + Caches + Release 资产共用），
    而本仓库单次构建产出的 artifact 约 270MB、默认保留 90 天 —— 实测累积到 **98 个 ≈ 24GB**；
    Release 侧另有 10 个 × 182MB ≈ 1.8GB（`-Keep 10`）。**纯属浪费**。
 2. 构建产物**本来就只在本地/远程使用**：远程是测试源与配置更新源，本地产物直接部署，
    GitHub 上的包基本没人下载 —— CI 的价值只有"验证能编译"，而本地一条命令同样能做到（23 秒）。
 3. 让仓库回归"上游代码存档"这个唯一职责，仓库体积与权限面都更小。
+
+2026-10-23 起通用源码仓库迁至 `CNS-Team/PGame-TSManager`，本策略继续有效。
 
 ## 具体改了什么
 

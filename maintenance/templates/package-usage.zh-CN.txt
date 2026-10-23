@@ -56,7 +56,7 @@ maintenance          更新、校验和维护工具
 
 六、项目地址
 ------------
-公开维护：https://github.com/Pigeon-X/PGame-TSManager
-构建下载：https://github.com/Pigeon-X/PGame-TSManager/releases
+公开维护：https://github.com/CNS-Team/PGame-TSManager
+源码与本地构建说明：https://github.com/CNS-Team/PGame-TSManager#构建
 旧版 TSManager 原作者：https://github.com/cc004/TSManager
 TShock 官方项目：https://github.com/Pryaxis/TShock

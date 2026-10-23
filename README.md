@@ -14,7 +14,7 @@
 <p align="center">
   <a href="#构建">本地构建说明</a>
   ·
-  <a href="https://github.com/Pigeon-X/PGame-TSManager/issues">问题反馈</a>
+  <a href="https://github.com/CNS-Team/PGame-TSManager/issues">问题反馈</a>
 </p>
 
 > [!IMPORTANT]
@@ -271,8 +271,16 @@ dotnet publish PGame-TSManager/PGame-TSManager.csproj `
 边界规则与对接原则见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)：
 TSM 只做「TShock 多进程控制面」，业务层（RPG / 维度 / Bot / 绑定）不进公共 Core。
 
+## 公开维护与反馈
+
+本项目由 [CNS-Team](https://github.com/CNS-Team) 组织公开维护，维护负责人为 [Pigeon-X](https://github.com/Pigeon-X)。
+正式源码仓库为 [CNS-Team/PGame-TSManager](https://github.com/CNS-Team/PGame-TSManager)。
+欢迎通过 [Issues](https://github.com/CNS-Team/PGame-TSManager/issues) 报告问题，或通过 Pull Request 提交通用功能与修复。
+提交问题时请附管理器、TShock 版本与脱敏日志；提交代码时请说明验证方法，不提交私人配置、令牌、世界或玩家数据。
+构建继续在本地执行，方式见上文「构建」。
+
 ## 致谢
 
 - 旧版多服管理器思路来自 [cc004/TSManager](https://github.com/cc004/TSManager)。
 - TShock 上游由 [Pryaxis/TShock](https://github.com/Pryaxis/TShock) 维护。
-- 本项目由 [Pigeon-X](https://github.com/Pigeon-X) 公开维护。
+- 感谢 [Pigeon-X](https://github.com/Pigeon-X) 发起并持续维护本项目。

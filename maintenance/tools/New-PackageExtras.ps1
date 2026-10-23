@@ -4,7 +4,7 @@ param(
     [Parameter(Mandatory = $true)][string]$Version,
     [Parameter(Mandatory = $true)][string]$Commit,
     [string]$RunNumber = '',
-    [string]$Repository = 'Pigeon-X/PGame-TSManager'
+    [string]$Repository = 'CNS-Team/PGame-TSManager'
 )
 
 $ErrorActionPreference = 'Stop'
