@@ -9,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Management;
 using System.Reflection.Metadata;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -806,6 +807,13 @@ namespace PGameTSManager
 
     }
 
+    internal enum WorkspacePage
+    {
+        Console,
+        Operations,
+        Plugins
+    }
+
     public sealed class MainWindow : Window
     {
         public static bool StartAllOnLoad { get; set; }
@@ -814,21 +822,37 @@ namespace PGameTSManager
         private readonly ListBox _serverList;
         private readonly ListBox _consoleList;
         private readonly TextBox _commandBox;
+        private readonly TextBox _serverSearch;
+        private readonly ObservableCollection<ServerContainer> _visibleContainers = new();
         private readonly TextBlock _statusText;
         private readonly TextBlock _alertText;
+        private readonly TextBlock _serverCountText;
+        private readonly TextBlock _summaryName;
+        private readonly TextBlock _summarySubtitle;
+        private readonly TextBlock _summaryPid;
+        private readonly TextBlock _summaryMemory;
+        private readonly TextBlock _summaryUptime;
+        private readonly TextBlock _summaryPorts;
         private readonly Button _startButton;
         private readonly Button _stopButton;
+        private readonly Button _restartButton;
         private readonly Button _startAllButton;
         private readonly Button _stopAllButton;
+        private readonly Button _settingsButton;
+        private readonly Button _folderButton;
         private readonly Button _consoleNav;
         private readonly Button _operationsNav;
+        private readonly Button _pluginsNav;
         private readonly Button _manageNav;
-        private readonly Button _toolsNav;
         private readonly OperationsCenterView _operationsView;
+        private readonly PluginLibraryView _pluginLibraryView;
+        private readonly Control _consolePage;
         private readonly Border _consolePanel;
         private readonly Grid _commandBar;
         private readonly ShapePath _maximizeIcon;
+        private readonly ShapePath _fullscreenIcon;
         private readonly ConsoleBuffer _systemConsole = new();
+        private WindowState _stateBeforeFullscreen = WindowState.Normal;
         private bool _consoleScrollScheduled;
         private DispatcherTimer? _statusTimer;
         private DispatcherTimer? _scheduleTimer;
@@ -866,7 +890,8 @@ namespace PGameTSManager
 
             _serverList = new ListBox
             {
-                ItemsSource = Containers,
+                Name = "ServerList",
+                ItemsSource = _visibleContainers,
                 ItemTemplate = Ui.Template<ServerContainer>(ServerSidebarItem),
                 ItemContainerTheme = BuildSidebarItemTheme(),
                 Background = Brushes.Transparent,
@@ -909,17 +934,28 @@ namespace PGameTSManager
             _statusText = Ui.T("准备就绪", 11, UiTheme.TextDim);
             _alertText = Ui.T("", 11, UiTheme.TextFaint);
             _alertText.HorizontalAlignment = HorizontalAlignment.Right;
+            _serverCountText = Ui.T("0", 10.5, UiTheme.TextFaint);
+            _serverSearch = Ui.Input(watermark: "搜索服务器");
+            _serverSearch.TextChanged += (_, _) => ApplyServerFilter(Current?.StableId);
+            _summaryName = Ui.T("服务器工作区", 20, UiTheme.Text, FontWeight.SemiBold);
+            _summarySubtitle = Ui.T("尚未选择服务器", 11, UiTheme.TextDim);
+            _summaryPid = Ui.T("PID  —", 11, UiTheme.TextDim);
+            _summaryMemory = Ui.T("内存  —", 11, UiTheme.LogInfo);
+            _summaryUptime = Ui.T("运行  —", 11, UiTheme.TextDim);
+            _summaryPorts = Ui.T("端口  —", 11, UiTheme.TextDim);
 
             _startButton = Ui.Btn("启动", StartCurrent, "primary", 64, 30);
             _stopButton = Ui.Btn("停止", StopCurrent, "danger", 64, 30);
+            _restartButton = Ui.Btn("重启", () => _ = RestartCurrentAsync(), null, 64, 30);
             _startAllButton = Ui.Btn("全部启动", () => _ = StartAllSequentialAsync(), null, 82, 30);
             _stopAllButton = Ui.Btn("全部停止", () => _ = StopAllAsync(), "danger", 82, 30);
+            _settingsButton = Ui.Btn("设置", OpenServerSettings, null, 58, 30);
+            _folderButton = Ui.Btn("目录", OpenCurrentFolder, null, 58, 30);
             _consoleNav = Ui.Btn("控制台", () => ShowWorkspace(false), "nav nav-active", 72, 30);
             _operationsNav = Ui.Btn("运维中心", () => ShowWorkspace(true), "nav", 88, 30);
+            _pluginsNav = Ui.Btn("插件库", () => ShowPage(WorkspacePage.Plugins), "nav", 72, 30);
             _manageNav = Ui.Btn("管理", null, "nav", 64, 30);
-            _toolsNav = Ui.Btn("工具", null, "nav", 64, 30);
             _manageNav.Flyout = BuildManagementFlyout();
-            _toolsNav.Flyout = BuildToolsFlyout();
             _maximizeIcon = new ShapePath
             {
                 Width = 12,
@@ -931,8 +967,26 @@ namespace PGameTSManager
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
+            _fullscreenIcon = new ShapePath
+            {
+                Width = 13,
+                Height = 13,
+                Data = FullscreenIconData(false),
+                Stroke = UiTheme.TextDim,
+                StrokeThickness = 1.1,
+                Stretch = Stretch.None,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
 
             _operationsView = new OperationsCenterView { IsVisible = false };
+            _pluginLibraryView = new PluginLibraryView(
+                _cfg,
+                container => OpenPluginsFor(container),
+                text => AppendLine("[插件库] " + text))
+            {
+                IsVisible = false
+            };
             _consolePanel = new Border
             {
                 Child = _consoleList,
@@ -942,14 +996,23 @@ namespace PGameTSManager
                 CornerRadius = new CornerRadius(8)
             };
             _commandBar = BuildCommandBar();
+            _consolePage = BuildConsolePage();
 
             Content = BuildLayout();
-            UpdateMaximizeIcon();
+            UpdateChromeIcons();
             Opened += OnOpened;
             Closing += OnClosing;
+            KeyDown += (_, e) =>
+            {
+                if (e.Key == Key.Escape && WindowState == WindowState.FullScreen)
+                {
+                    ToggleFullscreen();
+                    e.Handled = true;
+                }
+            };
             PropertyChanged += (_, e) =>
             {
-                if (e.Property == WindowStateProperty) UpdateMaximizeIcon();
+                if (e.Property == WindowStateProperty) UpdateChromeIcons();
             };
             Containers.CollectionChanged += ContainersChanged;
         }
@@ -989,7 +1052,7 @@ namespace PGameTSManager
 
             var workspace = Ui.Grid("*,Auto", "*");
             workspace.Margin = new Thickness(12, 0, 0, 0);
-            var pages = new Grid { Children = { _consolePanel, _operationsView } };
+            var pages = new Grid { Children = { _consolePage, _operationsView, _pluginLibraryView } };
             Ui.Place(pages, 0);
             workspace.Children.Add(pages);
             Ui.Place(_commandBar, 1);
@@ -1000,15 +1063,52 @@ namespace PGameTSManager
             Ui.Place(body, 2);
             root.Children.Add(body);
 
-            var status = Ui.Grid("*", "Auto,*");
+            var status = Ui.Grid("*", "*,*,Auto");
             status.Margin = new Thickness(14, 4, 14, 0);
             Ui.Place(_statusText, 0, 0);
             Ui.Place(_alertText, 0, 1);
+            var brand = Ui.T("流光工作室  ·  Pigeon-X  ·  1.2", 10, UiTheme.TextFaint);
+            brand.HorizontalAlignment = HorizontalAlignment.Right;
+            Ui.Place(brand, 0, 2);
             status.Children.Add(_statusText);
             status.Children.Add(_alertText);
+            status.Children.Add(brand);
             Ui.Place(status, 3);
             root.Children.Add(status);
             return root;
+        }
+
+        private Control BuildConsolePage()
+        {
+            var left = Ui.V(_summaryName, _summarySubtitle);
+            left.Spacing = 4;
+            left.VerticalAlignment = VerticalAlignment.Center;
+
+            var metrics = Ui.H(_summaryPid, _summaryMemory, _summaryUptime, _summaryPorts);
+            metrics.Spacing = 18;
+            metrics.VerticalAlignment = VerticalAlignment.Center;
+            metrics.HorizontalAlignment = HorizontalAlignment.Right;
+
+            var headerGrid = Ui.Grid("*", "*,Auto");
+            Ui.Place(left, 0, 0);
+            Ui.Place(metrics, 0, 1);
+            headerGrid.Children.Add(left);
+            headerGrid.Children.Add(metrics);
+            var header = new Border
+            {
+                Child = headerGrid,
+                Padding = new Thickness(2, 0, 2, 12),
+                BorderBrush = UiTheme.Border,
+                BorderThickness = new Thickness(0, 0, 0, 1)
+            };
+
+            var page = Ui.Grid("Auto,*", "*");
+            Ui.Place(header, 0);
+            Ui.Place(_consolePanel, 1);
+            _consolePanel.Margin = new Thickness(0, 10, 0, 0);
+            page.Children.Add(header);
+            page.Children.Add(_consolePanel);
+            return page;
         }
 
         private Control BuildWindowTitleBar()
@@ -1029,18 +1129,31 @@ namespace PGameTSManager
             bar.Children.Add(traffic);
 
             var title = Ui.T("PGame-TSManager", 10.5, UiTheme.TextFaint);
-            title.HorizontalAlignment = HorizontalAlignment.Center;
-            title.VerticalAlignment = VerticalAlignment.Center;
-            Ui.Place(title, 0, 1);
-            bar.Children.Add(title);
+            title.FontWeight = FontWeight.SemiBold;
+            var brand = Ui.H(
+                new Image
+                {
+                    Source = LoadBitmap("avares://PGame-TSManager/PGame-TSManager-logo.png"),
+                    Width = 20,
+                    Height = 20,
+                    Stretch = Stretch.UniformToFill
+                },
+                title);
+            brand.Spacing = 8;
+            brand.HorizontalAlignment = HorizontalAlignment.Center;
+            brand.VerticalAlignment = VerticalAlignment.Center;
+            Ui.Place(brand, 0, 1);
+            bar.Children.Add(brand);
 
+            var fullscreen = ChromeButton(_fullscreenIcon, "全屏 / 退出全屏", ToggleFullscreen);
             var min = ChromeButton(LineIcon(11, 1), "最小化", () => WindowState = WindowState.Minimized);
             var max = ChromeButton(_maximizeIcon, "最大化/还原", ToggleMaximize);
             var close = ChromeButton(CrossIcon(), "关闭", Close, "close");
+            fullscreen.Name = "TitleBarFullscreenButton";
             min.Name = "TitleBarMinimizeButton";
             max.Name = "TitleBarMaximizeButton";
             close.Name = "TitleBarCloseButton";
-            var actions = Ui.H(min, max, close);
+            var actions = Ui.H(fullscreen, min, max, close);
             actions.HorizontalAlignment = HorizontalAlignment.Right;
             Ui.Place(actions, 0, 2);
             bar.Children.Add(actions);
@@ -1140,19 +1253,39 @@ namespace PGameTSManager
             WindowState = WindowState == WindowState.Maximized
                 ? WindowState.Normal
                 : WindowState.Maximized;
-            UpdateMaximizeIcon();
+            UpdateChromeIcons();
         }
 
-        private void UpdateMaximizeIcon()
+        private void ToggleFullscreen()
+        {
+            if (WindowState == WindowState.FullScreen)
+            {
+                WindowState = _stateBeforeFullscreen;
+            }
+            else
+            {
+                _stateBeforeFullscreen = WindowState;
+                WindowState = WindowState.FullScreen;
+            }
+            UpdateChromeIcons();
+        }
+
+        private static StreamGeometry FullscreenIconData(bool restore)
+            => StreamGeometry.Parse(restore
+                ? "M 5,1 L 5,5 L 1,5 M 8,1 L 8,5 L 12,5 M 12,8 L 8,8 L 8,12 M 1,8 L 5,8 L 5,12"
+                : "M 1,5 L 1,1 L 5,1 M 8,1 L 12,1 L 12,5 M 12,8 L 12,12 L 8,12 M 5,12 L 1,12 L 1,8");
+
+        private void UpdateChromeIcons()
         {
             _maximizeIcon.Data = StreamGeometry.Parse(WindowState == WindowState.Maximized
                 ? "M 3,1 L 11,1 L 11,9 M 1,3 L 9,3 L 9,11 L 1,11 Z"
                 : "M 1,1 L 11,1 L 11,11 L 1,11 Z");
+            _fullscreenIcon.Data = FullscreenIconData(WindowState == WindowState.FullScreen);
         }
 
         private Control BuildHeader()
         {
-            var header = Ui.Grid("*", "Auto,*,Auto");
+            var header = Ui.Grid("*", "Auto,Auto,*,Auto");
             header.Margin = new Thickness(10, 0);
             header.Background = UiTheme.Surface;
 
@@ -1181,18 +1314,21 @@ namespace PGameTSManager
             Ui.Place(brand, 0, 0);
             header.Children.Add(brand);
 
-            var center = Ui.H(_consoleNav, _operationsNav, _manageNav, _toolsNav);
-            center.Spacing = 4;
-            center.HorizontalAlignment = HorizontalAlignment.Center;
-            center.VerticalAlignment = VerticalAlignment.Center;
-            Ui.Place(center, 0, 1);
-            header.Children.Add(center);
+            var nav = Ui.H(_consoleNav, _operationsNav, _pluginsNav, _manageNav);
+            nav.Spacing = 4;
+            nav.Margin = new Thickness(18, 0, 0, 0);
+            nav.HorizontalAlignment = HorizontalAlignment.Left;
+            nav.VerticalAlignment = VerticalAlignment.Center;
+            Ui.Place(nav, 0, 1);
+            header.Children.Add(nav);
 
-            var actions = Ui.H(_startButton, _stopButton, _startAllButton, _stopAllButton);
+            var actions = Ui.H(
+                _startButton, _stopButton, _restartButton,
+                _startAllButton, _stopAllButton, _settingsButton, _folderButton);
             actions.Spacing = 6;
             actions.HorizontalAlignment = HorizontalAlignment.Right;
             actions.VerticalAlignment = VerticalAlignment.Center;
-            Ui.Place(actions, 0, 2);
+            Ui.Place(actions, 0, 3);
             header.Children.Add(actions);
             return header;
         }
@@ -1200,6 +1336,8 @@ namespace PGameTSManager
         private MenuFlyout BuildManagementFlyout()
         {
             var flyout = new MenuFlyout();
+            flyout.Items.Add(MenuAction("保存世界", () => SendQuickCommand("/save")));
+            flyout.Items.Add(new Separator());
             flyout.Items.Add(MenuAction("服务器设置", OpenServerSettings));
             flyout.Items.Add(MenuAction("插件开关", OpenPlugins));
             flyout.Items.Add(MenuAction("玩家管理", OpenPlayers));
@@ -1212,13 +1350,6 @@ namespace PGameTSManager
             return flyout;
         }
 
-        private MenuFlyout BuildToolsFlyout()
-        {
-            var flyout = new MenuFlyout();
-            flyout.Items.Add(MenuAction("保存世界", () => SendQuickCommand("/save")));
-            return flyout;
-        }
-
         private static MenuItem MenuAction(string text, Action action)
         {
             var item = new MenuItem { Header = text };
@@ -1228,11 +1359,34 @@ namespace PGameTSManager
 
         private Control BuildSidebar()
         {
-            var panel = Ui.V(
-                Ui.T("服务器", 11, UiTheme.TextDim, FontWeight.SemiBold),
-                _serverList
-            );
-            panel.Spacing = 8;
+            var heading = Ui.Grid("*", "*,Auto");
+            var title = Ui.T("本机服务器", 12, UiTheme.Text, FontWeight.SemiBold);
+            Ui.Place(title, 0, 0);
+            _serverCountText.HorizontalAlignment = HorizontalAlignment.Right;
+            Ui.Place(_serverCountText, 0, 1);
+            heading.Children.Add(title);
+            heading.Children.Add(_serverCountText);
+
+            var footer = Ui.Grid("*", "*,*");
+            var add = Ui.Btn("新建服务器", OpenNewServer);
+            var refresh = Ui.Btn("刷新列表", ReloadContainers);
+            Ui.Place(add, 0, 0);
+            Ui.Place(refresh, 0, 1);
+            refresh.Margin = new Thickness(6, 0, 0, 0);
+            footer.Children.Add(add);
+            footer.Children.Add(refresh);
+
+            var panel = Ui.Grid("Auto,Auto,*,Auto", "*");
+            Ui.Place(heading, 0);
+            Ui.Place(_serverSearch, 1);
+            _serverSearch.Margin = new Thickness(0, 8, 0, 8);
+            Ui.Place(_serverList, 2);
+            Ui.Place(footer, 3);
+            footer.Margin = new Thickness(0, 8, 0, 0);
+            panel.Children.Add(heading);
+            panel.Children.Add(_serverSearch);
+            panel.Children.Add(_serverList);
+            panel.Children.Add(footer);
             var card = Ui.Card(panel, 10, UiTheme.Surface);
             card.Margin = new Thickness(0, 0, 0, 0);
             return card;
@@ -1430,6 +1584,10 @@ namespace PGameTSManager
                 ? "未配置服务器"
                 : $"服务器 {Containers.Count} 台 · 运行 {Containers.Count(c => c.IsRunning)} 台 · " +
                   $"在线 {Containers.Where(c => c.IsRunning).Sum(c => Math.Max(0, c.PlayerCount))} 人";
+            _serverCountText.Text = _visibleContainers.Count == Containers.Count
+                ? Containers.Count.ToString()
+                : $"{_visibleContainers.Count}/{Containers.Count}";
+            UpdateServerSummary();
         }
 
         private void ReloadContainers()
@@ -1461,11 +1619,38 @@ namespace PGameTSManager
             {
                 var selected = Containers.FirstOrDefault(c =>
                     string.Equals(c.StableId, selectedId, StringComparison.OrdinalIgnoreCase)) ?? Containers[0];
-                _serverList.SelectedItem = selected;
+                ApplyServerFilter(selected.StableId);
+            }
+            else
+            {
+                _visibleContainers.Clear();
+                _serverList.SelectedItem = null;
             }
             _operationsView.SetContext(Current, Containers);
+            _pluginLibraryView.SetContext(Current, Containers);
             BuildTrayMenu();
             UpdateActionStates();
+            UpdateServerCount();
+        }
+
+        private void ApplyServerFilter(string? selectedId)
+        {
+            var query = (_serverSearch.Text ?? "").Trim();
+            var matches = Containers.Where(c =>
+                query.Length == 0 ||
+                c.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                c.ListLabel.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                c.GamePort.ToString().Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                c.RestPort.ToString().Contains(query, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            _visibleContainers.Clear();
+            foreach (var container in matches) _visibleContainers.Add(container);
+
+            var selected = matches.FirstOrDefault(c =>
+                string.Equals(c.StableId, selectedId, StringComparison.OrdinalIgnoreCase)) ??
+                matches.FirstOrDefault();
+            _serverList.SelectedItem = selected;
             UpdateServerCount();
         }
 
@@ -1478,9 +1663,45 @@ namespace PGameTSManager
         {
             _consoleList.ItemsSource = current?.ConsoleLines ?? _systemConsole;
             _operationsView.SetContext(current, Containers);
+            _pluginLibraryView.SetContext(current, Containers);
             UpdateActionStates();
             UpdateServerCount();
+            UpdateServerSummary();
             ScrollConsoleToEnd();
+        }
+
+        private void UpdateServerSummary()
+        {
+            var current = Current;
+            if (current == null)
+            {
+                _summaryName.Text = "服务器工作区";
+                _summarySubtitle.Text = "尚未选择服务器";
+                _summaryPid.Text = "PID  —";
+                _summaryMemory.Text = "内存  —";
+                _summaryUptime.Text = "运行  —";
+                _summaryPorts.Text = "端口  —";
+                return;
+            }
+
+            _summaryName.Text = current.Name;
+            _summarySubtitle.Text = $"{current.StatusText}  ·  端口 {current.GamePort} / REST {current.RestPort}" +
+                                    $"  ·  玩家 {current.PlayerText}  ·  插件 {current.PluginCount}" +
+                                    $"  ·  世界 {FormatSize(current.WorldSizeBytes)}";
+            _summaryPid.Text = "PID  " + (current.IsRunning ? current.ProcessId.ToString() : "—");
+            _summaryMemory.Text = "内存  " + (current.IsRunning ? FormatSize(current.MemoryBytes) : "—");
+            _summaryUptime.Text = "运行  " + (current.IsRunning && !string.IsNullOrWhiteSpace(current.Uptime)
+                ? current.Uptime
+                : "—");
+            _summaryPorts.Text = $"端口  {current.GamePort} / {current.RestPort}";
+        }
+
+        private static string FormatSize(long bytes)
+        {
+            if (bytes >= 1024L * 1024L * 1024L) return (bytes / 1024d / 1024d / 1024d).ToString("0.0") + " GB";
+            if (bytes >= 1024L * 1024L) return (bytes / 1024d / 1024d).ToString("0.0") + " MB";
+            if (bytes >= 1024L) return (bytes / 1024d).ToString("0.0") + " KB";
+            return bytes + " B";
         }
 
         private void ScrollConsoleToEnd()
@@ -1516,12 +1737,21 @@ namespace PGameTSManager
 
         private void ShowWorkspace(bool operations)
         {
-            _consolePanel.IsVisible = !operations;
-            _commandBar.IsVisible = !operations;
-            _operationsView.IsVisible = operations;
-            SetNavState(_consoleNav, !operations);
-            SetNavState(_operationsNav, operations);
-            if (operations) _operationsView.RefreshAll();
+            ShowPage(operations ? WorkspacePage.Operations : WorkspacePage.Console);
+        }
+
+        private void ShowPage(WorkspacePage page)
+        {
+            _consolePage.IsVisible = page == WorkspacePage.Console;
+            _commandBar.IsVisible = page == WorkspacePage.Console;
+            _operationsView.IsVisible = page == WorkspacePage.Operations;
+            _pluginLibraryView.IsVisible = page == WorkspacePage.Plugins;
+            SetNavState(_consoleNav, page == WorkspacePage.Console);
+            SetNavState(_operationsNav, page == WorkspacePage.Operations);
+            SetNavState(_pluginsNav, page == WorkspacePage.Plugins);
+            if (page == WorkspacePage.Operations) _operationsView.RefreshAll();
+            if (page == WorkspacePage.Plugins) _pluginLibraryView.RefreshAll();
+            if (page == WorkspacePage.Console) ScrollConsoleToEnd();
         }
 
         private static void SetNavState(Button button, bool active)
@@ -1783,8 +2013,12 @@ namespace PGameTSManager
             var current = Current;
             _startButton.IsEnabled = current != null && !current.IsRunning;
             _stopButton.IsEnabled = current?.IsRunning == true;
+            _restartButton.IsEnabled = current?.IsRunning == true;
             _startAllButton.IsEnabled = Containers.Any(c => !c.IsRunning);
             _stopAllButton.IsEnabled = Containers.Any(c => c.IsRunning);
+            _settingsButton.IsEnabled = current != null;
+            _folderButton.IsEnabled = current != null;
+            UpdateServerSummary();
         }
 
         private void AppendLine(string text)
@@ -1850,6 +2084,21 @@ namespace PGameTSManager
             if (!await ConfirmStopAsync(Current.Name)) return;
             Current.IsRunning = false;
             UpdateActionStates();
+        }
+
+        private async Task RestartCurrentAsync()
+        {
+            var current = Current;
+            if (current == null || !current.IsRunning) return;
+            if (!await Ui.ConfirmAsync(
+                    this,
+                    "重启服务器",
+                    $"{current.Name}\n\n将先保存并停止当前实例，停止成功后再通过 TSM 正门启动。",
+                    "重启",
+                    true))
+                return;
+            current.IsRunning = false;
+            await RestartOneAsync(current, "手动重启");
         }
 
         private async Task<bool> ConfirmStopAsync(string serverName)
@@ -1945,6 +2194,16 @@ namespace PGameTSManager
         {
             var current = Current;
             if (current == null) return;
+            await OpenPluginsForAsync(current);
+        }
+
+        private void OpenPluginsFor(ServerContainer current)
+        {
+            _ = OpenPluginsForAsync(current);
+        }
+
+        private async Task OpenPluginsForAsync(ServerContainer current)
+        {
             var pool = ManagerConfig.Resolve(_cfg.pluginDir);
             var dialog = new PluginWindow(current.Name, current.ProfileDirectory, pool,
                 command => current.SendCommandViaRest(command, out _));
@@ -1955,6 +2214,13 @@ namespace PGameTSManager
                 current.IsRunning = false;
                 _ = RestartOneAsync(current, "插件开关");
             }
+        }
+
+        private void OpenCurrentFolder()
+        {
+            var current = Current;
+            if (current == null) return;
+            OperationsCenterView.OpenFolder(current.ProfileDirectory);
         }
 
         private async void OpenServerSettings()
@@ -2249,6 +2515,289 @@ namespace PGameTSManager
                     });
             }
             catch { }
+        }
+    }
+
+    public sealed class PluginArtifactRow
+    {
+        public string Name { get; init; } = "";
+        public string FileName { get; init; } = "";
+        public string Version { get; init; } = "";
+        public string Size { get; init; } = "";
+        public string Sha256 { get; init; } = "";
+        public string Path { get; init; } = "";
+    }
+
+    public sealed class PluginLibraryView : UserControl
+    {
+        private readonly ManagerConfig _config;
+        private readonly Action<ServerContainer> _editServerPlugins;
+        private readonly Action<string> _log;
+        private readonly TextBox _search;
+        private readonly ListBox _list;
+        private readonly ComboBox _server;
+        private readonly TextBlock _status;
+        private readonly TextBlock _count;
+        private readonly Button _editButton;
+        private List<PluginArtifactRow> _rows = new();
+        private List<ServerContainer> _containers = new();
+        private ServerContainer? _selected;
+        private bool _loading;
+
+        public PluginLibraryView(
+            ManagerConfig config,
+            Action<ServerContainer> editServerPlugins,
+            Action<string> log)
+        {
+            _config = config;
+            _editServerPlugins = editServerPlugins;
+            _log = log;
+            _search = Ui.Input(watermark: "搜索名称、文件名、版本或 SHA256");
+            _search.TextChanged += (_, _) => ApplyFilter();
+            _list = new ListBox
+            {
+                ItemTemplate = Ui.Template<PluginArtifactRow>(PluginRow),
+                Background = UiTheme.Surface
+            };
+            _server = Ui.Combo();
+            _server.ItemTemplate = Ui.Template<ServerContainer>(c => Ui.T(c.ListLabel, 11.5));
+            _editButton = Ui.Btn("编辑此服插件", EditSelectedPlugins, "primary");
+            _editButton.IsEnabled = false;
+            _server.SelectionChanged += (_, _) =>
+            {
+                _selected = _server.SelectedItem as ServerContainer;
+                _editButton.IsEnabled = _selected != null;
+            };
+            _status = Ui.T("打开此页后载入总插件库", 11, UiTheme.TextDim);
+            _count = Ui.T("0 个插件", 11, UiTheme.TextFaint);
+
+            var heading = Ui.Grid("*", "*,Auto");
+            var title = Ui.V(
+                Ui.T("总插件库", 20, UiTheme.Text, FontWeight.SemiBold),
+                Ui.T("集中查看 DLL 版本与哈希，并为目标服选择加载项", 11, UiTheme.TextDim));
+            title.Spacing = 4;
+            Ui.Place(title, 0, 0);
+            var headingActions = Ui.H(
+                Ui.Btn("打开目录", OpenPluginFolder),
+                Ui.Btn("导入 DLL", () => _ = ImportAsync()),
+                Ui.Btn("刷新", () => _ = RefreshAllAsync()));
+            headingActions.Spacing = 6;
+            headingActions.HorizontalAlignment = HorizontalAlignment.Right;
+            headingActions.VerticalAlignment = VerticalAlignment.Center;
+            Ui.Place(headingActions, 0, 1);
+            heading.Children.Add(title);
+            heading.Children.Add(headingActions);
+
+            var toolbar = Ui.Grid("*", "*,Auto,Auto,Auto");
+            Ui.Place(_search, 0, 0);
+            Ui.Place(_count, 0, 1);
+            _count.Margin = new Thickness(12, 0, 12, 0);
+            _count.VerticalAlignment = VerticalAlignment.Center;
+            Ui.Place(_server, 0, 2);
+            _server.Width = 180;
+            Ui.Place(_editButton, 0, 3);
+            _editButton.Margin = new Thickness(8, 0, 0, 0);
+            toolbar.Children.Add(_search);
+            toolbar.Children.Add(_count);
+            toolbar.Children.Add(_server);
+            toolbar.Children.Add(_editButton);
+
+            var listHeader = Ui.Grid("*", "220,120,100,*");
+            string[] labels = { "插件 / 文件名", "程序集版本", "大小", "SHA256" };
+            for (var i = 0; i < labels.Length; i++)
+            {
+                var label = Ui.T(labels[i], 10.5, UiTheme.TextDim);
+                Ui.Place(label, 0, i);
+                listHeader.Children.Add(label);
+            }
+            listHeader.Margin = new Thickness(12, 0, 12, 6);
+
+            var listGrid = Ui.Grid("Auto,*", "*");
+            Ui.Place(listHeader, 0);
+            Ui.Place(_list, 1);
+            listGrid.Children.Add(listHeader);
+            listGrid.Children.Add(_list);
+            var listCard = new Border
+            {
+                Background = UiTheme.Surface,
+                BorderBrush = UiTheme.Border,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(10),
+                Child = listGrid
+            };
+
+            var root = Ui.Grid("Auto,Auto,*,Auto", "*");
+            Ui.Place(heading, 0);
+            Ui.Place(toolbar, 1);
+            toolbar.Margin = new Thickness(0, 16, 0, 10);
+            Ui.Place(listCard, 2);
+            Ui.Place(_status, 3);
+            _status.Margin = new Thickness(2, 8, 0, 0);
+            root.Children.Add(heading);
+            root.Children.Add(toolbar);
+            root.Children.Add(listCard);
+            root.Children.Add(_status);
+            Content = root;
+        }
+
+        public void SetContext(ServerContainer? current, IEnumerable<ServerContainer> containers)
+        {
+            _containers = containers.ToList();
+            _server.ItemsSource = _containers;
+            var target = current != null && _containers.Contains(current) ? current : _containers.FirstOrDefault();
+            _server.SelectedItem = target;
+            _selected = target;
+            _editButton.IsEnabled = target != null;
+        }
+
+        public void RefreshAll()
+        {
+            _ = RefreshAllAsync();
+        }
+
+        private async Task RefreshAllAsync()
+        {
+            if (_loading) return;
+            _loading = true;
+            _status.Text = "正在读取插件元数据与 SHA256…";
+            try
+            {
+                var dir = ManagerConfig.Resolve(_config.pluginDir);
+                if (!Directory.Exists(dir))
+                {
+                    _rows = new List<PluginArtifactRow>();
+                    ApplyFilter();
+                    _status.Text = "插件目录不存在：" + dir;
+                    return;
+                }
+
+                var files = Directory.GetFiles(dir, "*.dll").OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
+                _rows = await Task.Run(() => files.Select(ReadRow).Where(x => x != null).Select(x => x!).ToList());
+                ApplyFilter();
+                _status.Text = $"插件总库：{dir}  ·  {_rows.Count} 个 DLL";
+            }
+            catch (Exception ex)
+            {
+                _status.Text = "读取失败：" + ex.Message;
+            }
+            finally
+            {
+                _loading = false;
+            }
+        }
+
+        private static PluginArtifactRow? ReadRow(string path)
+        {
+            try
+            {
+                var info = new FileInfo(path);
+                var assembly = System.Reflection.AssemblyName.GetAssemblyName(path);
+                using var stream = File.OpenRead(path);
+                var sha = Convert.ToHexString(SHA256.HashData(stream));
+                return new PluginArtifactRow
+                {
+                    Name = assembly.Name ?? Path.GetFileNameWithoutExtension(path),
+                    FileName = info.Name,
+                    Version = assembly.Version?.ToString() ?? "-",
+                    Size = FormatSize(info.Length),
+                    Sha256 = sha,
+                    Path = path
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private void ApplyFilter()
+        {
+            var query = (_search.Text ?? "").Trim();
+            var rows = query.Length == 0
+                ? _rows
+                : _rows.Where(row =>
+                    row.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    row.FileName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    row.Version.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    row.Sha256.Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
+            _list.ItemsSource = rows;
+            _count.Text = query.Length == 0
+                ? $"{_rows.Count} 个插件"
+                : $"{rows.Count}/{_rows.Count} 个插件";
+        }
+
+        private static Control PluginRow(PluginArtifactRow row)
+        {
+            var name = Ui.V(
+                Ui.T(row.Name, 12, UiTheme.Text, FontWeight.SemiBold),
+                Ui.T(row.FileName, 10.5, UiTheme.TextDim));
+            name.Spacing = 2;
+            var version = Ui.T(row.Version, 11, UiTheme.AccentHover);
+            var size = Ui.T(row.Size, 11, UiTheme.TextDim);
+            var sha = Ui.T(row.Sha256, 10, UiTheme.TextFaint, FontWeight.Normal,
+                TextWrapping.NoWrap, TextTrimming.CharacterEllipsis);
+            var grid = Ui.Grid("*", "220,120,100,*");
+            Ui.Place(name, 0, 0);
+            Ui.Place(version, 0, 1);
+            Ui.Place(size, 0, 2);
+            Ui.Place(sha, 0, 3);
+            grid.Children.Add(name);
+            grid.Children.Add(version);
+            grid.Children.Add(size);
+            grid.Children.Add(sha);
+            return Ui.Card(grid, 8, UiTheme.SurfaceRaised);
+        }
+
+        private async Task ImportAsync()
+        {
+            var top = TopLevel.GetTopLevel(this);
+            if (top == null) return;
+            var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "导入插件 DLL",
+                AllowMultiple = true,
+                FileTypeFilter = new[]
+                {
+                    new FilePickerFileType("插件程序集") { Patterns = new[] { "*.dll" } }
+                }
+            });
+            if (files.Count == 0) return;
+            var target = ManagerConfig.Resolve(_config.pluginDir);
+            Directory.CreateDirectory(target);
+            var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+            var copied = 0;
+            foreach (var file in files)
+            {
+                var source = file.TryGetLocalPath();
+                if (string.IsNullOrWhiteSpace(source) || !File.Exists(source)) continue;
+                var name = Path.GetFileName(source);
+                var destination = Path.Combine(target, name);
+                if (File.Exists(destination))
+                {
+                    var backup = destination + ".bak-import-" + stamp;
+                    if (!File.Exists(backup)) File.Copy(destination, backup);
+                }
+                File.Copy(source, destination, true);
+                copied++;
+            }
+            _log($"导入 {copied} 个插件到总库");
+            await RefreshAllAsync();
+        }
+
+        private void EditSelectedPlugins()
+        {
+            if (_selected != null) _editServerPlugins(_selected);
+        }
+
+        private void OpenPluginFolder()
+            => OperationsCenterView.OpenFolder(ManagerConfig.Resolve(_config.pluginDir));
+
+        private static string FormatSize(long bytes)
+        {
+            if (bytes >= 1024L * 1024L) return (bytes / 1024d / 1024d).ToString("0.0") + " MB";
+            if (bytes >= 1024L) return (bytes / 1024d).ToString("0.0") + " KB";
+            return bytes + " B";
         }
     }
 
