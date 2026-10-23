@@ -829,6 +829,7 @@ namespace PGameTSManager
         private readonly Grid _commandBar;
         private readonly ShapePath _maximizeIcon;
         private readonly ConsoleBuffer _systemConsole = new();
+        private bool _consoleScrollScheduled;
         private DispatcherTimer? _statusTimer;
         private DispatcherTimer? _scheduleTimer;
         private DispatcherTimer? _capacityTimer;
@@ -1484,10 +1485,33 @@ namespace PGameTSManager
 
         private void ScrollConsoleToEnd()
         {
-            var items = _consoleList.ItemsSource as System.Collections.IEnumerable;
-            if (items == null) return;
-            var last = items.Cast<object>().LastOrDefault();
-            if (last != null) _consoleList.ScrollIntoView(last);
+            if (_consoleScrollScheduled) return;
+            _consoleScrollScheduled = true;
+            Dispatcher.UIThread.Post(() =>
+            {
+                _consoleScrollScheduled = false;
+                try
+                {
+                    // 虚拟列表在批量增删后直接 ScrollIntoView 可能拿到无效 arrange 矩形。
+                    // 优先滚到 ScrollViewer 末端；找不到时才回退到最后一项。
+                    var viewer = _consoleList.GetVisualDescendants()
+                        .OfType<ScrollViewer>()
+                        .FirstOrDefault();
+                    if (viewer != null)
+                    {
+                        viewer.ScrollToEnd();
+                        return;
+                    }
+
+                    var items = _consoleList.ItemsSource as System.Collections.IEnumerable;
+                    var last = items?.Cast<object>().LastOrDefault();
+                    if (last != null) _consoleList.ScrollIntoView(last);
+                }
+                catch
+                {
+                    // 布局过渡期的滚动失败不应影响控制台继续输出。
+                }
+            }, DispatcherPriority.Background);
         }
 
         private void ShowWorkspace(bool operations)

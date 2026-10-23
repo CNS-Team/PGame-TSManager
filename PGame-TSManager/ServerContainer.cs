@@ -65,9 +65,15 @@ namespace PGameTSManager
         public void AppendBatch(IReadOnlyList<ConsoleEntry> entries)
         {
             if (entries.Count == 0) return;
-            AddRange(entries);
-            var overflow = Count - _maxEntries;
-            if (overflow > 0) RemoveRange(0, overflow);
+
+            // 先裁掉本次会溢出的旧行，再追加；避免 1 万行瞬间进列表后再大批删除，
+            // 造成虚拟化面板的 extent 在布局中途剧烈变化。
+            var incoming = entries.Count > _maxEntries
+                ? entries.Skip(entries.Count - _maxEntries).ToList()
+                : entries;
+            var overflow = Count + incoming.Count - _maxEntries;
+            if (overflow > 0) RemoveRange(0, Math.Min(Count, overflow));
+            AddRange(incoming);
         }
     }
 
