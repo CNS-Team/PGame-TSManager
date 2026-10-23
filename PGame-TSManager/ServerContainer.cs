@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -10,7 +11,9 @@ using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Collections;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Newtonsoft.Json;
@@ -36,13 +39,36 @@ namespace PGameTSManager
         public ConsoleEntry(IReadOnlyList<ConsoleRun> runs)
         {
             Runs = runs;
-            Text = string.Concat(runs.Select(run => run.Text));
+            Text = runs.Count == 1 ? runs[0].Text : string.Concat(runs.Select(run => run.Text));
             Brush = runs.Count > 0 ? runs[runs.Count - 1].Brush : UiTheme.LogNormal;
         }
 
         public string Text { get; }
         public IBrush Brush { get; }
         public IReadOnlyList<ConsoleRun> Runs { get; }
+    }
+
+    /// <summary>
+    /// 控制台环形缓冲。AvaloniaList.AddRange 只发一次集合通知，
+    /// 避免 TShock /help 等刷屏时每一行都触发布局和滚动。
+    /// </summary>
+    public sealed class ConsoleBuffer : AvaloniaList<ConsoleEntry>
+    {
+        public const int DefaultCapacity = 4096;
+        private readonly int _maxEntries;
+
+        public ConsoleBuffer(int maxEntries = DefaultCapacity)
+        {
+            _maxEntries = Math.Max(128, maxEntries);
+        }
+
+        public void AppendBatch(IReadOnlyList<ConsoleEntry> entries)
+        {
+            if (entries.Count == 0) return;
+            AddRange(entries);
+            var overflow = Count - _maxEntries;
+            if (overflow > 0) RemoveRange(0, overflow);
+        }
     }
 
     internal sealed class WorldBuildPlan
@@ -149,9 +175,21 @@ namespace PGameTSManager
             }
         }
 
-        public ObservableCollection<ConsoleEntry> ConsoleLines { get; } = new();
+        public ConsoleBuffer ConsoleLines { get; } = new();
         public event Action<ServerContainer>? OnTextChanged;
         private string _title;
+
+        private readonly object _pendingConsoleGate = new();
+        private readonly Queue<PendingConsoleLine> _pendingConsole = new();
+        private int _consoleFlushScheduled;
+
+        private readonly record struct PendingConsoleLine(ConsoleEntry Entry, string Raw);
+        private readonly record struct PendingLogWrite(string Date, string Time, string Text);
+
+        private readonly BlockingCollection<PendingLogWrite> _pendingLogWrites =
+            new(new ConcurrentQueue<PendingLogWrite>());
+        private readonly object _logWriterGate = new();
+        private Task? _logWriterTask;
 
         public string Title
         {
@@ -1016,27 +1054,66 @@ namespace PGameTSManager
             }
         }
 
-        private static readonly object FileLogGate = new();
-
         /// <summary>把控制台内容同时写到文件：&lt;程序目录&gt;\Logs\&lt;服&gt;-yyyyMMdd.log（便于事后排查/导出）。</summary>
         private void WriteToFile(string text)
         {
             try
             {
-                var dir = ManagerConfig.Resolve(_managerConfig.logDir);
-                Directory.CreateDirectory(dir);
-                var safe = string.Join("_", Name.Split(Path.GetInvalidFileNameChars()));
-                var file = Path.Combine(dir, safe + "-" + DateTime.Now.ToString("yyyyMMdd") + ".log");
                 var line = text.Replace("\r\n", "\n").TrimEnd('\n');
                 if (line.Length == 0) return;
-                lock (FileLogGate)
-                {
-                    File.AppendAllText(file, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + line + Environment.NewLine,
-                        new UTF8Encoding(false));
-                }
+
+                EnsureLogWriterStarted();
+                var now = DateTime.Now;
+                _pendingLogWrites.Add(new PendingLogWrite(
+                    now.ToString("yyyyMMdd"),
+                    now.ToString("HH:mm:ss"),
+                    line));
             }
             catch { }
         }
+
+        private void EnsureLogWriterStarted()
+        {
+            if (_logWriterTask != null) return;
+            lock (_logWriterGate)
+            {
+                if (_logWriterTask != null) return;
+                _logWriterTask = Task.Run(LogWriterLoop);
+            }
+        }
+
+        private void LogWriterLoop()
+        {
+            var batch = new List<PendingLogWrite>(256);
+            foreach (var first in _pendingLogWrites.GetConsumingEnumerable())
+            {
+                batch.Clear();
+                batch.Add(first);
+                while (batch.Count < 256 && _pendingLogWrites.TryTake(out var next))
+                    batch.Add(next);
+
+                try
+                {
+                    var dir = ManagerConfig.Resolve(_managerConfig.logDir);
+                    Directory.CreateDirectory(dir);
+                    var safe = string.Join("_", Name.Split(Path.GetInvalidFileNameChars()));
+                    foreach (var day in batch.GroupBy(item => item.Date))
+                    {
+                        var text = new StringBuilder();
+                        foreach (var item in day)
+                            text.Append('[').Append(item.Time).Append("] ")
+                                .Append(item.Text).Append(Environment.NewLine);
+                        var file = Path.Combine(dir, safe + "-" + day.Key + ".log");
+                        File.AppendAllText(file, text.ToString(), new UTF8Encoding(false));
+                    }
+                }
+                catch
+                {
+                    // 日志写盘失败不能影响服务器控制台/进程。
+                }
+            }
+        }
+
         private void RaiseAlert(string title, string detail)
         {
             try { OnAlert?.Invoke(this, title, detail); } catch { }
@@ -1865,7 +1942,84 @@ namespace PGameTSManager
         private void AddText(string text, bool isError = false)
         {
             if (string.IsNullOrEmpty(text)) return;
-            try { Dispatcher.UIThread.Post(() => AppendText(text, isError)); } catch { }
+
+            // 文件写入和颜色解析都留在调用线程，避免刷屏时阻塞 UI。
+            WriteToFile(text);
+            foreach (var raw in text.Replace("\r\n", "\n").Split('\n'))
+            {
+                if (raw.Length == 0) continue;
+                var runs = ParseConsoleRuns(raw, isError);
+                if (runs.Count == 0) continue;
+                lock (_pendingConsoleGate)
+                    _pendingConsole.Enqueue(new PendingConsoleLine(new ConsoleEntry(runs), raw));
+            }
+            ScheduleConsoleFlush();
+        }
+
+        private void ScheduleConsoleFlush()
+        {
+            if (Interlocked.CompareExchange(ref _consoleFlushScheduled, 1, 0) != 0) return;
+            try
+            {
+                Dispatcher.UIThread.Post(FlushConsoleQueue, DispatcherPriority.Background);
+            }
+            catch
+            {
+                Volatile.Write(ref _consoleFlushScheduled, 0);
+            }
+        }
+
+        private void FlushConsoleQueue()
+        {
+            List<PendingConsoleLine> batch;
+            lock (_pendingConsoleGate)
+            {
+                if (_pendingConsole.Count == 0)
+                {
+                    Volatile.Write(ref _consoleFlushScheduled, 0);
+                    return;
+                }
+                batch = new List<PendingConsoleLine>(_pendingConsole);
+                _pendingConsole.Clear();
+            }
+
+            try
+            {
+                var entries = new List<ConsoleEntry>(batch.Count);
+                foreach (var item in batch)
+                {
+                    AnalyzeConsoleLine(item.Raw);
+                    entries.Add(item.Entry);
+                }
+                ConsoleLines.AppendBatch(entries);
+                OnTextChanged?.Invoke(this);
+            }
+            finally
+            {
+                Volatile.Write(ref _consoleFlushScheduled, 0);
+                lock (_pendingConsoleGate)
+                {
+                    if (_pendingConsole.Count > 0) ScheduleConsoleFlush();
+                }
+            }
+        }
+
+        private void AnalyzeConsoleLine(string raw)
+        {
+            if (IsWatchdogManualStopLine(raw))
+            {
+                _userStopRequested = true;
+                _watchdogSuppressUntilUtc = DateTime.UtcNow.AddSeconds(120);
+            }
+            if (IsWatchdogMaintenanceLine(raw))
+            {
+                _healthFailureCount = 0;
+                _lastHealthyUtc = DateTime.UtcNow;
+                var seconds = Math.Max(120, _managerConfig.watchdogMaintenanceSuppressSeconds);
+                _watchdogSuppressUntilUtc = DateTime.UtcNow.AddSeconds(seconds);
+            }
+            if (IsSevereLine(raw)) RaiseAlert($"服务器日志出现严重异常：{Name}", raw.Trim());
+            RecordWatchdogLogError(raw);
         }
 
         /// <summary>
@@ -1908,15 +2062,17 @@ namespace PGameTSManager
             }
         }
 
-        /// <summary>把一行渲染进面板：ANSI 与 [c/RRGGBB:...] 都拆成真实颜色分段，其它行按关键字着色。</summary>
-        private void AppendLine(string raw, bool isError = false)
-        {
-            var runs = ParseConsoleRuns(raw, isError);
-            if (runs.Count > 0) ConsoleLines.Add(new ConsoleEntry(runs));
-        }
-
         private List<ConsoleRun> ParseConsoleRuns(string raw, bool isError)
         {
+            // 绝大多数 TShock 行没有颜色标记，先走零正则快路径。
+            if (raw.IndexOf('\x1B') < 0 && raw.IndexOf("[c/", StringComparison.Ordinal) < 0)
+            {
+                return new List<ConsoleRun>(1)
+                {
+                    new(raw, isError ? ClrError : ColorFor(raw))
+                };
+            }
+
             var plain = AnsiColorRx.Replace(ColorTagRx.Replace(raw, "$2"), "");
             var fallback = isError ? ClrError : ColorFor(plain);
             var runs = new List<ConsoleRun>();
@@ -2013,37 +2169,6 @@ namespace PGameTSManager
                 "97" => BrushOfRgb("FFFFFF", fallback),
                 _ => fallback
             };
-        }
-
-        private void AppendText(string text, bool isError = false)
-        {
-            try
-            {
-                foreach (var raw in text.Replace("\r\n", "\n").Split('\n'))
-                {
-                    if (raw.Length == 0) continue;
-                    AppendLine(raw, isError);
-                    if (IsWatchdogManualStopLine(raw))
-                    {
-                        _userStopRequested = true;
-                        _watchdogSuppressUntilUtc = DateTime.UtcNow.AddSeconds(120);
-                    }
-                    if (IsWatchdogMaintenanceLine(raw))
-                    {
-                        _healthFailureCount = 0;
-                        _lastHealthyUtc = DateTime.UtcNow;
-                        var seconds = Math.Max(120, _managerConfig.watchdogMaintenanceSuppressSeconds);
-                        _watchdogSuppressUntilUtc = DateTime.UtcNow.AddSeconds(seconds);
-                    }
-                    if (IsSevereLine(raw)) RaiseAlert($"服务器日志出现严重异常：{Name}", raw.Trim());
-                    RecordWatchdogLogError(raw);
-                }
-                WriteToFile(text);          // ★ 同时落盘，方便事后查（Logs\<服>-日期.log）
-
-                while (ConsoleLines.Count > 4096) ConsoleLines.RemoveAt(0);
-                OnTextChanged?.Invoke(this);
-            }
-            catch { }
         }
 
         private static bool IsWatchdogMaintenanceLine(string line)

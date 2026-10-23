@@ -822,11 +822,13 @@ namespace PGameTSManager
         private readonly Button _stopAllButton;
         private readonly Button _consoleNav;
         private readonly Button _operationsNav;
+        private readonly Button _manageNav;
+        private readonly Button _toolsNav;
         private readonly OperationsCenterView _operationsView;
         private readonly Border _consolePanel;
         private readonly Grid _commandBar;
         private readonly ShapePath _maximizeIcon;
-        private readonly ObservableCollection<ConsoleEntry> _systemConsole = new();
+        private readonly ConsoleBuffer _systemConsole = new();
         private DispatcherTimer? _statusTimer;
         private DispatcherTimer? _scheduleTimer;
         private DispatcherTimer? _capacityTimer;
@@ -911,8 +913,12 @@ namespace PGameTSManager
             _stopButton = Ui.Btn("停止", StopCurrent, "danger", 64, 30);
             _startAllButton = Ui.Btn("全部启动", () => _ = StartAllSequentialAsync(), null, 82, 30);
             _stopAllButton = Ui.Btn("全部停止", () => _ = StopAllAsync(), "danger", 82, 30);
-            _consoleNav = Ui.Btn("控制台", () => ShowWorkspace(false), "nav nav-active", 64, 30);
-            _operationsNav = Ui.Btn("运维中心", () => ShowWorkspace(true), "nav", 72, 30);
+            _consoleNav = Ui.Btn("控制台", () => ShowWorkspace(false), "nav nav-active", 72, 30);
+            _operationsNav = Ui.Btn("运维中心", () => ShowWorkspace(true), "nav", 88, 30);
+            _manageNav = Ui.Btn("管理", null, "nav", 64, 30);
+            _toolsNav = Ui.Btn("工具", null, "nav", 64, 30);
+            _manageNav.Flyout = BuildManagementFlyout();
+            _toolsNav.Flyout = BuildToolsFlyout();
             _maximizeIcon = new ShapePath
             {
                 Width = 12,
@@ -1174,14 +1180,14 @@ namespace PGameTSManager
             Ui.Place(brand, 0, 0);
             header.Children.Add(brand);
 
-            var center = Ui.H(_consoleNav, _operationsNav);
-            center.Spacing = 6;
+            var center = Ui.H(_consoleNav, _operationsNav, _manageNav, _toolsNav);
+            center.Spacing = 4;
             center.HorizontalAlignment = HorizontalAlignment.Center;
             center.VerticalAlignment = VerticalAlignment.Center;
             Ui.Place(center, 0, 1);
             header.Children.Add(center);
 
-            var actions = Ui.H(BuildManagementMenu(), _startButton, _stopButton, _startAllButton, _stopAllButton);
+            var actions = Ui.H(_startButton, _stopButton, _startAllButton, _stopAllButton);
             actions.Spacing = 6;
             actions.HorizontalAlignment = HorizontalAlignment.Right;
             actions.VerticalAlignment = VerticalAlignment.Center;
@@ -1190,30 +1196,26 @@ namespace PGameTSManager
             return header;
         }
 
-        private Control BuildManagementMenu()
+        private MenuFlyout BuildManagementFlyout()
         {
-            var menu = new Menu
-            {
-                Background = Brushes.Transparent,
-                VerticalAlignment = VerticalAlignment.Center,
-                Height = 30
-            };
-            var manage = new MenuItem { Header = "管理" };
-            manage.Items.Add(MenuAction("服务器设置", OpenServerSettings));
-            manage.Items.Add(MenuAction("插件开关", OpenPlugins));
-            manage.Items.Add(MenuAction("玩家管理", OpenPlayers));
-            manage.Items.Add(MenuAction("插件检查", OpenPluginCheck));
-            manage.Items.Add(MenuAction("计划任务", OpenSchedules));
-            manage.Items.Add(MenuAction("回滚中心", OpenBackups));
-            manage.Items.Add(new Separator());
-            manage.Items.Add(MenuAction("新建服务器", OpenNewServer));
-            manage.Items.Add(MenuAction("刷新服务器列表", ReloadContainers));
-            menu.Items.Add(manage);
+            var flyout = new MenuFlyout();
+            flyout.Items.Add(MenuAction("服务器设置", OpenServerSettings));
+            flyout.Items.Add(MenuAction("插件开关", OpenPlugins));
+            flyout.Items.Add(MenuAction("玩家管理", OpenPlayers));
+            flyout.Items.Add(MenuAction("插件检查", OpenPluginCheck));
+            flyout.Items.Add(MenuAction("计划任务", OpenSchedules));
+            flyout.Items.Add(MenuAction("回滚中心", OpenBackups));
+            flyout.Items.Add(new Separator());
+            flyout.Items.Add(MenuAction("新建服务器", OpenNewServer));
+            flyout.Items.Add(MenuAction("刷新服务器列表", ReloadContainers));
+            return flyout;
+        }
 
-            var tools = new MenuItem { Header = "工具" };
-            tools.Items.Add(MenuAction("保存世界", () => SendQuickCommand("/save")));
-            menu.Items.Add(tools);
-            return menu;
+        private MenuFlyout BuildToolsFlyout()
+        {
+            var flyout = new MenuFlyout();
+            flyout.Items.Add(MenuAction("保存世界", () => SendQuickCommand("/save")));
+            return flyout;
         }
 
         private static MenuItem MenuAction(string text, Action action)
