@@ -29,12 +29,20 @@ namespace PGameTSManager
 
             var cfgPath = Path.Combine(AppContext.BaseDirectory, "config.json");
             sb.AppendLine("管理器配置: " + (File.Exists(cfgPath) ? "[正常]" : "[失败：不存在]"));
+            var rootScripts = ScriptPolicy.FindScripts(AppContext.BaseDirectory, excludeBuildDirectories: false);
+            if (rootScripts.Count > 0)
+            {
+                ok = false;
+                sb.AppendLine("部署目录脚本: [失败] " + string.Join(", ", rootScripts.Select(Path.GetFileName)));
+            }
+            else
+            {
+                sb.AppendLine("部署目录脚本: [正常] 0 个 .ps1/.bat/.cmd/.sh");
+            }
             var scriptDependencies = (cfg.externalProcesses ?? new List<ExternalProcessProfile>())
                 .Where(x => x != null && x.enabled)
                 .Select(x => x.exe ?? "")
-                .Where(x => x.EndsWith(".ps1", StringComparison.OrdinalIgnoreCase) ||
-                            x.EndsWith(".bat", StringComparison.OrdinalIgnoreCase) ||
-                            x.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase))
+                .Where(ScriptPolicy.IsScript)
                 .ToList();
             if (scriptDependencies.Count > 0)
             {

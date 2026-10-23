@@ -36,6 +36,15 @@ PGame-TSManager.exe --selfcheck
 PGame-TSManager.exe --nowindow
     强制无界面运行。
 
+PGame-TSManager.exe --tool config-check "<服目录>"
+    只读校验 TShock 中文键、REST 字段与 SSC 英文。
+
+PGame-TSManager.exe --tool new-server --root . --name "<名字>" --port 7779 --rest-port 7880
+    新建受管服务器。
+
+PGame-TSManager.exe --tool script-audit --root .
+    扫描并拒绝 .ps1/.bat/.cmd/.sh。
+
 四、目录说明
 ------------
 config.json          服务器列表和运行策略

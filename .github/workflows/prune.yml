@@ -43,109 +43,18 @@ jobs:
   prune:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
       - name: Prune artifacts / caches / releases
-        shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $api = "https://api.github.com/repos/$env:REPO"
-          $hdr = @{
-            Authorization            = "Bearer $env:GH_TOKEN"
-            Accept                   = "application/vnd.github+json"
-            'X-GitHub-Api-Version'   = "2022-11-28"
-            'User-Agent'             = "pigeon-prune"
-          }
-          $aDays = [int]("${{ github.event.inputs.artifact_days || '0' }}")
-          $cDays = [int]("${{ github.event.inputs.cache_days || '0' }}")
-          $keep  = [int]("${{ github.event.inputs.release_keep || '0' }}")
-          $rDays = [int]("${{ github.event.inputs.run_days || '0' }}")
-          $dry   = ("${{ github.event.inputs.dry_run || 'false' }}").ToLower() -eq 'true'
-          $now   = [DateTime]::UtcNow
-          function Should-Drop([string]$iso, [int]$days) {
-            if ($days -le 0) { return $true }
-            try { return ($now - ([DateTime]$iso).ToUniversalTime()).TotalDays -gt $days } catch { return $false }
-          }
-          $sum = [ordered]@{ artifacts = 0; artifactMB = 0.0; caches = 0; cacheMB = 0.0; releases = 0; runs = 0; dryRun = $dry }
-
-          # 1) Artifacts
-          $page = 1
-          while ($true) {
-            $r = Invoke-RestMethod -Headers $hdr -Uri "$api/actions/artifacts?per_page=100&page=$page"
-            if (-not $r.artifacts -or $r.artifacts.Count -eq 0) { break }
-            foreach ($a in $r.artifacts) {
-              if (Should-Drop $a.created_at $aDays) {
-                $mb = [math]::Round(([int64]$a.size_in_bytes) / 1MB, 2)
-                Write-Host ("ARTIFACT  {0,10} MB  {1}  {2}" -f $mb, $a.created_at, $a.name)
-                $sum.artifacts++; $sum.artifactMB += $mb
-                if (-not $dry) { Invoke-RestMethod -Method Delete -Headers $hdr -Uri "$api/actions/artifacts/$($a.id)" | Out-Null }
-              }
-            }
-            if ($page * 100 -ge $r.total_count) { break }
-            $page++
-          }
-
-          # 2) Caches
-          $page = 1
-          while ($true) {
-            $r = Invoke-RestMethod -Headers $hdr -Uri "$api/actions/caches?per_page=100&page=$page"
-            if (-not $r.actions_caches -or $r.actions_caches.Count -eq 0) { break }
-            foreach ($c in $r.actions_caches) {
-              if (Should-Drop $c.created_at $cDays) {
-                $mb = [math]::Round(([int64]$c.size_in_bytes) / 1MB, 2)
-                Write-Host ("CACHE     {0,10} MB  {1}  {2}  key={3}" -f $mb, $c.created_at, $c.ref, $c.key)
-                $sum.caches++; $sum.cacheMB += $mb
-                if (-not $dry) { Invoke-RestMethod -Method Delete -Headers $hdr -Uri "$api/actions/caches/$($c.id)" | Out-Null }
-              }
-            }
-            if ($page * 100 -ge $r.total_count) { break }
-            $page++
-          }
-
-          # 3) Releases（保留最近 N 个，其余连资产一起删）
-          $rels = @(Invoke-RestMethod -Headers $hdr -Uri "$api/releases?per_page=100")
-          if ($rels.Count -gt $keep) {
-            foreach ($rel in ($rels | Sort-Object created_at -Descending | Select-Object -Skip $keep)) {
-              $assetBytes = ($rel.assets | Measure-Object -Property size -Sum).Sum
-              if (-not $assetBytes) { $assetBytes = 0 }
-              $assetMB = [math]::Round(([double]$assetBytes) / 1MB, 2)
-              Write-Host ("RELEASE   {0,10} MB  {1}  {2}  (assets={3})" -f $assetMB, $rel.created_at, $rel.tag_name, @($rel.assets).Count)
-              $sum.releases++
-              if (-not $dry) { Invoke-RestMethod -Method Delete -Headers $hdr -Uri "$api/releases/$($rel.id)" | Out-Null }
-            }
-          }
-
-          # 4) 可选：删旧 workflow run（连日志一起清）
-          if ($rDays -gt 0) {
-            $page = 1
-            while ($true) {
-              $r = Invoke-RestMethod -Headers $hdr -Uri "$api/actions/runs?per_page=100&page=$page"
-              if (-not $r.workflow_runs -or $r.workflow_runs.Count -eq 0) { break }
-              foreach ($run in $r.workflow_runs) {
-                if ($run.status -eq 'completed' -and (Should-Drop $run.created_at $rDays)) {
-                  Write-Host ("RUN       {0}  #{1}  {2}  {3}" -f $run.created_at, $run.run_number, $run.name, $run.head_branch)
-                  $sum.runs++
-                  if (-not $dry) { Invoke-RestMethod -Method Delete -Headers $hdr -Uri "$api/actions/runs/$($run.id)" | Out-Null }
-                }
-              }
-              if ($page * 100 -ge $r.total_count) { break }
-              $page++
-            }
-          }
-
-          Write-Host ""
-          Write-Host ("汇总：artifacts={0} ({1} MB) / caches={2} ({3} MB) / releases={4} / runs={5} / dryRun={6}" -f `
-            $sum.artifacts, $sum.artifactMB, $sum.caches, $sum.cacheMB, $sum.releases, $sum.runs, $sum.dryRun)
-          if ($env:GITHUB_STEP_SUMMARY) {
-            @(
-              "### Prune 汇总 (dryRun=$($sum.dryRun))"
-              ""
-              "| 对象 | 数量 | 体积(MB) |"
-              "|---|---|---|"
-              "| Artifacts | $($sum.artifacts) | $($sum.artifactMB) |"
-              "| Caches | $($sum.caches) | $($sum.cacheMB) |"
-              "| Releases | $($sum.releases) | - |"
-              "| Workflow runs | $($sum.runs) | - |"
-            ) -join "`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-          }
+        run: >-
+          dotnet run --project maintenance/PruneTool/PruneTool.csproj -c Release --
+          --artifact-days "${{ github.event.inputs.artifact_days || '0' }}"
+          --cache-days "${{ github.event.inputs.cache_days || '0' }}"
+          --release-keep "${{ github.event.inputs.release_keep || '0' }}"
+          --run-days "${{ github.event.inputs.run_days || '0' }}"
+          --dry-run "${{ github.event.inputs.dry_run || 'false' }}"

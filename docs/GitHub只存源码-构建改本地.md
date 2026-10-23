@@ -35,24 +35,22 @@
 
 ```powershell
 # 主库（Core + 通用版三套包）
-./maintenance/tools/Build-Local.ps1
-#   -SkipTShockRuntime  已有 Core 运行时 / 离线时跳过下载
-#   -OutputRoot D:\out  换输出目录
+dotnet run --project PGame-TSManager/PGame-TSManager.csproj -c Release -- --tool package --root .
+#   --skip-runtime  已有 Core 运行时 / 离线时跳过下载
+#   --out D:\out    换输出目录
 
 # 个人库（Core + 个人 overlay → 个人版包）
-powershell -ExecutionPolicy Bypass -File .\scripts\Build-Local.ps1 `
-  -CorePath "<PGame-TSManager 仓库路径>" -SourceRoot "D:\59934\Desktop\PGame-TSManager"
+dotnet run --project PGame-TSManager/PGame-TSManager.csproj -c Release -- --tool package --root "<PGame-TSManager 仓库路径>" --out "<个人产物目录>"
 ```
 
-主库脚本**等价于原 CI 的打包流程**（`dotnet publish` 自包含单文件 → 注入官方 TShock 运行时 →
+主库命令**等价于原 CI 的打包流程**（`dotnet publish` 自包含单文件 → 注入官方 TShock 运行时 →
 生成 `universal` / `template` / `source` 三套包 → 塞入使用说明与更新说明 → 仓库布局自检），
-2026-10-11 本地实测：**23 秒**跑完，产出 `source 0.7MB` / `template 90.7MB` / `universal 90.7MB`，
-布局自检 `passed: 248 tracked files`。
+2026-10-11 本地实测：**23 秒**跑完，产出 `source 0.7MB` / `template 90.7MB` / `universal 90.7MB`。
 
 ## 恢复方式（万一以后要重开 CI）
 
 流水线定义仍在 Git 历史里（删除它们的提交之前），`git show <commit>^:.github/workflows/build.yml` 可取回；
-`maintenance/tools/Prune-GitHubReleases.ps1` 也保留未删。
+Release 清理已内置为 `--tool prune-releases`。
 
 ## 对分发的影响（需要维护方决定的一件事）
 
@@ -78,7 +76,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\Build-Local.ps1 `
 2. 旁证：本仓库在 public 状态下曾堆到 **23.5GB artifacts** 也没触发计费拦截 —— 拦截来自**私有**仓库那 500MB 私有存储；
 3. 因此"**把私有仓库转 public**"是一条与"付款 / 调整 spending limit"并列的**真实可行的止血手段**（公开库 Actions 免费）；
 4. 私有库（`-Personal` / `PGameAPI` / `PigeonRPG`）在用户处理完 Billing 前，**任何 run 都不会启动**；
-   这段期间要个人版产物，直接用本地 `scripts\Build-Local.ps1`（23 秒、0 成本、不经过 GitHub Actions）。
+   这段期间要个人版产物，直接用本地 `--tool package`（0 成本、不经过 GitHub Actions）。
 
 ## 当前状态与约定（2026-10-11 23:3x 定，双方已对齐）
 
@@ -86,7 +84,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\Build-Local.ps1 `
 ① 私有库 CI 一律【不要触发】—— 在用户处理完 Billing（付款方式 / spending limit / 或转 public）之前
    任何 run 都是 3-4 秒 failure 的失败记录，只会刷垃圾；公开库（PGame-TSManager）不受影响，prune.yml 照常可用。
 ② 个人版产物的主路径 = 本地打包（Billing 未修好期间的唯一路径）：
-     pwsh -File .\scripts\Build-Local.ps1 -SkipSync
+     PGame-TSManager.exe --tool package --root . --skip-runtime
    11-Bot 实测：9.5 秒 → artifacts\PGame-TSManager-personal.zip 82.8 MB / 336 条目；
    TSM 侧核对同一文件：86,811,188 B（≈82.8 MB）。这个体积/条目数即日后 CI 恢复时的验收基线（产物 ≤82MB、artifact 数 ≤1）。
 ③ -SkipSync 的语义：不重新 clone 公共 Core，用本地 core 克隆 + D:\59934\Desktop\PGame-TSManager 同步 overlay
@@ -97,7 +95,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\Build-Local.ps1 `
 ## 用户定案（2026-10-11 23:5x，11-Bot 登记）：个人版走**本地构建**
 
 ```text
-1) 个人版产物唯一渠道 = 本地 scripts\Build-Local.ps1
+1) 个人版产物唯一渠道 = 本地 `PGame-TSManager.exe --tool package`
    （11-Bot 实测：9.5 秒 → 82.8MB / 336 条目 / 解压 219.2MB；
      解压后布局 Core(27) / Servers(269) / Plugins(32) / Tools(5) + exe + config + personal-overlay.json，解压即用）
 2) PGame-TSManager-Personal/.github/workflows/build-personal.yml 保留但不触发

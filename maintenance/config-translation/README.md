@@ -30,7 +30,7 @@
 3. 应用映射并运行校验：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ..\tools\Test-TShockConfig.ps1 -ServerPath 'D:\59934\Desktop\流光服\1.流光城'
+PGame-TSManager.exe --tool config-check "D:\59934\Desktop\流光服\1.流光城"
 ```
 
 校验会报出残留英文键（说明汉化没应用）与新增字段（说明映射需更新）。

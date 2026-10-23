@@ -44,6 +44,11 @@ namespace PGameTSManager
         [STAThread]
         public static void Main(string[] args)
         {
+            if (args.Any(a => string.Equals(a, "--tool", StringComparison.OrdinalIgnoreCase)))
+            {
+                Environment.ExitCode = AdminCli.Run(args);
+                return;
+            }
             if (args.Any(a => string.Equals(a, "--selfcheck", StringComparison.OrdinalIgnoreCase)))
             {
                 Environment.ExitCode = SelfCheck.Run();
@@ -540,6 +545,11 @@ namespace PGameTSManager
 
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             var args = desktop.Args ?? Array.Empty<string>();
+            if (args.Any(a => string.Equals(a, "--tool", StringComparison.OrdinalIgnoreCase)))
+            {
+                desktop.Shutdown(AdminCli.Run(args));
+                return;
+            }
             if (args.Any(a => string.Equals(a, "--selfcheck", StringComparison.OrdinalIgnoreCase)))
             {
                 desktop.Shutdown(SelfCheck.Run());

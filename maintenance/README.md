@@ -13,7 +13,7 @@ Tools/      维护工具和模板
 
 | 目录 | 职责 |
 | --- | --- |
-| `tools/` | 迁移、模板生成、配置校验和构建脚本 |
+| `tools/` | 迁移、模板生成、配置校验和构建说明（执行入口已内置到管理器 exe） |
 | `templates/` | 通用 TShock 配置模板 |
 | `tshock-update/` | TShock 上游跟进流程 |
 | `config-translation/` | TShock 中文键映射 |
@@ -21,6 +21,7 @@ Tools/      维护工具和模板
 | `ssc-lock/` | SSC 英文冻结规则 |
 | `help-lock/` | `/help` 行为冻结规则 |
 | `plugin-maintenance/` | 插件维护和依赖规则 |
+| `PruneTool/` | GitHub Actions 存储清理（C#，无脚本） |
 
 ## 固定规则
 
@@ -41,7 +42,7 @@ Tools/      维护工具和模板
 
 ## 构建顺序
 
-1. 修改源码或维护脚本。
+1. 修改源码。
 2. 本地构建和自检。
 3. 提交 Git。
 4. GitHub Actions 构建。
@@ -53,8 +54,7 @@ Tools/      维护工具和模板
 ```powershell
 dotnet build PGame-TSManager.sln -c Release
 
-powershell -ExecutionPolicy Bypass -File maintenance/tools/New-UniversalBundle.ps1 `
-  -RepositoryRoot . `
-  -PublishDirectory artifacts/manager `
-  -OutputPath artifacts/PGame-TSManager-universal.zip
+dotnet run --project PGame-TSManager/PGame-TSManager.csproj -c Release -- --tool package --root .
 ```
+
+仓库和发布包不包含 `.ps1/.bat/.cmd/.sh`；所有维护动作由管理器进程内 C# 执行。

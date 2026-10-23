@@ -63,12 +63,7 @@ internal sealed class ExternalProcessRuntime
         var workdir = Resolve(_profile.workdir);
         var exe = Resolve(_profile.exe, workdir);
         if (!File.Exists(exe)) throw new FileNotFoundException("external process executable not found", exe);
-        if (exe.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase) ||
-            exe.EndsWith(".bat", StringComparison.OrdinalIgnoreCase) ||
-            exe.EndsWith(".ps1", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("管理器不执行脚本型外部进程；请配置原生 exe。");
-        }
+        ScriptPolicy.ThrowIfScript(exe, "外部进程启动");
 
         var info = new ProcessStartInfo
         {
@@ -98,12 +93,7 @@ internal sealed class ExternalProcessRuntime
         {
             var workdir = Resolve(_profile.workdir);
             var exe = Resolve(_profile.exe, workdir);
-            if (exe.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase) ||
-                exe.EndsWith(".bat", StringComparison.OrdinalIgnoreCase) ||
-                exe.EndsWith(".ps1", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException("管理器不执行脚本型停止命令；请配置原生 exe。");
-            }
+            ScriptPolicy.ThrowIfScript(exe, "外部进程停止");
             var stop = new ProcessStartInfo
             {
                 FileName = exe,

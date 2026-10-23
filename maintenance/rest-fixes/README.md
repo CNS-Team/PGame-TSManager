@@ -36,7 +36,7 @@ REST 外部应用令牌字典的**字段名必须中文化**，否则令牌读�
 ## 校验
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ..\tools\Test-TShockConfig.ps1 -ServerPath '<服务端目录>'
+PGame-TSManager.exe --tool config-check "<服务端目录>"
 ```
 
 `REST 令牌字段` 一项会直接指出仍是英文键或值缺失的令牌。

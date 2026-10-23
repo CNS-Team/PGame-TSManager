@@ -12,7 +12,7 @@ SSC（服务端角色）配置保持英文原文。
 ## 校验
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ..\tools\Test-TShockConfig.ps1 -ServerPath '<服务端目录>'
+PGame-TSManager.exe --tool config-check "<服务端目录>"
 ```
 
 `SSC 保持英文` 一项出现中文键即 FAIL。

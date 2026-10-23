@@ -49,7 +49,7 @@
 - SQLite 默认数据库配置
 - REST API 默认配置
 - 默认必需插件：`TShockAPI.dll`、`HotReload.dll`
-- 打包脚本会下载官方 TShock Windows x64 运行时并注入 `Core`（**本地构建**时执行，GitHub 上不再构建）
+- 打包命令会下载官方 TShock Windows x64 运行时并注入 `Core`（**本地构建**时执行，GitHub 上不再构建）
 - 公共占位令牌，不包含私人令牌、MySQL 密码或玩家数据
 
 通用包不包含世界文件。使用者只需要把世界文件放入 `Servers\Worlds`。
@@ -63,13 +63,13 @@ PGame-TSManager 用一个窗口管理多个 TShock 服务端。它负责：
 - 插件总库与每服插件清单同步
 - TShock config、SSC、初始物品可视化编辑
 - 启动前备份、回滚中心、看门狗和异常告警
-- 自检、维护工具，以及一键本地打包脚本（`maintenance\tools\Build-Local.ps1`；流水线已迁出 GitHub）
+- 自检、维护与打包全部由管理器 exe 的 `--tool` 命令完成（流水线已迁出 GitHub）
 
 它不替代 TShock 本身，也不会把世界、数据库、日志或玩家数据提交到 Git。
 
 > [!IMPORTANT]
 > 管理器运行期逻辑全部在 C# 系统底层完成，不调用 PowerShell、`.bat`、`.cmd` 或其它脚本协作完成功能。
-> 维护与打包脚本只用于开发构建，不进入干净管理包，也不是运行期依赖。
+> 维护、建服、配置校验、打包、迁移、TShock 更新和 Release 清理同样内置在 exe 中；仓库与发布包均不携带 `.ps1/.bat/.cmd/.sh`。
 
 ## UI 技术栈
 
@@ -116,7 +116,7 @@ PGame-TSManager/
 | `Core` | TShock 运行时、依赖、数据、日志、备份和运行沙箱 |
 | `Servers` | 每服配置、TShock 配置和世界文件 |
 | `Plugins` | 统一插件总库 |
-| `Tools` | 不出现在干净管理包；维护脚本仅用于开发构建 |
+| `Tools` | 不出现在干净管理包；维护命令已内置到 exe |
 
 ## 快速开始
 
@@ -232,22 +232,22 @@ PGame-TSManager.exe --selfcheck
 
 ## 构建
 
-> **一条命令**（推荐）：需要 .NET 9 SDK 与 PowerShell 7，在仓库根目录执行：
+> **一条命令**（推荐）：需要 .NET 9 SDK。在仓库根目录执行：
 
 ```powershell
-./maintenance/tools/Build-Local.ps1
+dotnet run --project PGame-TSManager/PGame-TSManager.csproj -c Release -- --tool package --root .
 ```
 
 它会依次完成：`dotnet publish` 自包含单文件 → 下载官方 TShock 运行时注入 `Core` → 生成三套包
-（`universal` / `template` / `source`）→ 把使用说明与更新说明塞进 zip → 跑一次仓库布局自检。
+（`universal` / `template` / `source`）→ 把使用说明与更新说明塞进 zip → 对产物做脚本审计。
 产物在 `artifacts\` 下；常用参数：
 
 ```powershell
-./maintenance/tools/Build-Local.ps1 -SkipTShockRuntime      # 已有 Core 运行时，跳过下载
-./maintenance/tools/Build-Local.ps1 -OutputRoot D:\out      # 换输出目录
+dotnet run --project PGame-TSManager/PGame-TSManager.csproj -c Release -- --tool package --root . --skip-runtime
+dotnet run --project PGame-TSManager/PGame-TSManager.csproj -c Release -- --tool package --root . --out D:\out
 ```
 
-手工分步（与脚本等价）：
+手工分步（与工具等价）：
 
 ```powershell
 dotnet build PGame-TSManager.sln -c Release
@@ -259,15 +259,15 @@ dotnet publish PGame-TSManager/PGame-TSManager.csproj `
   -o artifacts/manager
 ```
 
-通用包和模板包会自动调用 `Add-TShockTemplates.ps1` 写入两套 TShock 模板。
+通用包和模板包由 `--tool package` 在 C# 内写入两套 TShock 模板。
 
 ## 发布包
 
 | 包 | 用途 |
 | --- | --- |
-| `PGame-TSManager-universal.zip` | 管理器、维护工具和两套 TShock 模板 |
+| `PGame-TSManager-universal.zip` | 管理器、内置维护命令和两套 TShock 模板 |
 | `PGame-TSManager-template.zip` | 管理器模板和两套 TShock 模板 |
-| `PGame-TSManager-source.zip` | 源码、工作流和维护脚本 |
+| `PGame-TSManager-source.zip` | 源码与文档 |
 
 **GitHub 不再构建、也不再发布**（2026-10-11 起）：流水线 `build.yml` 已移除，
 历史 Artifacts 与 Release 资产已清空，`.github/workflows/prune.yml` 每日兜底删净残留。
