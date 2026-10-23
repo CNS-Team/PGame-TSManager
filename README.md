@@ -5,6 +5,10 @@
 </p>
 
 <p align="center">
+  团队：流光工作室　·　作者：<a href="https://github.com/cc004">cc004</a>、<a href="https://github.com/Pigeon-X">Pigeon-X</a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/build-local%20only-8A2BE2" alt="Local build only">
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D4" alt="Windows 10/11">
   <img src="https://img.shields.io/badge/TShock-6.2.x-4B8BBE" alt="TShock 6.2.x">
@@ -63,6 +67,10 @@ PGame-TSManager 用一个窗口管理多个 TShock 服务端。它负责：
 
 它不替代 TShock 本身，也不会把世界、数据库、日志或玩家数据提交到 Git。
 
+> [!IMPORTANT]
+> 管理器运行期逻辑全部在 C# 系统底层完成，不调用 PowerShell、`.bat`、`.cmd` 或其它脚本协作完成功能。
+> 维护与打包脚本只用于开发构建，不进入干净管理包，也不是运行期依赖。
+
 ## UI 技术栈
 
 界面已从 WPF 全量迁移到 **Avalonia UI 11.3**，运行时仍只面向 Windows（WMI、子进程、托盘和单实例互斥都依赖 Windows）。
@@ -72,7 +80,7 @@ PGame-TSManager 用一个窗口管理多个 TShock 服务端。它负责：
 - 控制台保留 ANSI 真彩色和 Terraria `[c/RRGGBB:文字]` 的分段着色。
 - 发布方式仍是本地自包含单文件，不依赖目标机器预装 Avalonia 或 .NET。
 
-## 四个目录
+## 干净管理包目录
 
 运行端统一使用四个可见目录：
 
@@ -80,13 +88,13 @@ PGame-TSManager 用一个窗口管理多个 TShock 服务端。它负责：
 PGame-TSManager/
 ├─ PGame-TSManager.exe
 ├─ config.json
+├─ README.md
+├─ 使用说明.txt
 ├─ Core/
 │  ├─ TShock.Server.exe
 │  ├─ GeoIP.dat
 │  ├─ bin/
 │  ├─ i18n/
-│  ├─ runtimes/
-│  ├─ x64/
 │  ├─ Data/
 │  ├─ Backups/
 │  ├─ Logs/
@@ -100,9 +108,7 @@ PGame-TSManager/
 │  │     ├─ config.json
 │  │     └─ tshock/config.json
 │  └─ Worlds/
-├─ Plugins/
-└─ Tools/
-   └─ maintenance/
+└─ Plugins/
 ```
 
 | 目录 | 用途 |
@@ -110,7 +116,7 @@ PGame-TSManager/
 | `Core` | TShock 运行时、依赖、数据、日志、备份和运行沙箱 |
 | `Servers` | 每服配置、TShock 配置和世界文件 |
 | `Plugins` | 统一插件总库 |
-| `Tools` | 维护工具、模板和脚本 |
+| `Tools` | 不出现在干净管理包；维护脚本仅用于开发构建 |
 
 ## 快速开始
 
@@ -194,7 +200,7 @@ PGame-TSManager.exe --selfcheck
 | 看门狗 | 异常退出自动重启，连续失败后停止并告警 |
 | 内存压缩 | 空服时压缩工作集，不关闭端口、不中断首次进入 |
 | 单实例 | 重复双击 exe 只唤醒已有管理器，不创建第二个窗口 |
-| 自定义标题栏 | 左侧红黄绿三点、居中标题、右侧最小化/最大化/关闭；支持拖动与双击最大化 |
+| 自定义标题栏 | 左侧红黄绿三点、居中标题、右侧全屏/最小化/最大化/关闭；支持拖动、双击最大化和 `Esc` 退出全屏 |
 
 ## 常用命令
 
@@ -218,6 +224,7 @@ PGame-TSManager.exe --selfcheck
 ## TShock 维护规则
 
 - TShock 更新通过 `Tools\maintenance\tshock-update` 独立处理。
+- 管理器运行期不执行任何 PowerShell、bat 或 cmd 脚本。
 - `config.json` 使用中文键。
 - REST 令牌字段使用「用户名 / 用户组」。
 - `sscconfig.json` 保持英文，不翻译、不改键、不改字段。

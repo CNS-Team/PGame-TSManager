@@ -10,6 +10,10 @@
     <RootNamespace>PGameTSManager</RootNamespace>
     <AssemblyTitle>PGame-TSManager</AssemblyTitle>
     <Product>PGame-TSManager</Product>
+    <Company>流光工作室</Company>
+    <Authors>cc004;Pigeon-X</Authors>
+    <Copyright>Copyright © 流光工作室 / cc004 / Pigeon-X</Copyright>
+    <Description>Windows 平台 TShock 多服务器管理器</Description>
     <Version>1.2.0</Version>
     <ApplicationIcon>PGame-TSManager.ico</ApplicationIcon>
     <SatelliteResourceLanguages>zh-Hans</SatelliteResourceLanguages>

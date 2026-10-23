@@ -63,9 +63,17 @@ internal sealed class ExternalProcessRuntime
         var workdir = Resolve(_profile.workdir);
         var exe = Resolve(_profile.exe, workdir);
         if (!File.Exists(exe)) throw new FileNotFoundException("external process executable not found", exe);
+        if (exe.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase) ||
+            exe.EndsWith(".bat", StringComparison.OrdinalIgnoreCase) ||
+            exe.EndsWith(".ps1", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("管理器不执行脚本型外部进程；请配置原生 exe。");
+        }
 
         var info = new ProcessStartInfo
         {
+            FileName = exe,
+            Arguments = JoinArgs(_profile.args),
             WorkingDirectory = workdir,
             UseShellExecute = false,
             CreateNoWindow = true,
@@ -74,17 +82,6 @@ internal sealed class ExternalProcessRuntime
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8
         };
-        if (exe.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase) ||
-            exe.EndsWith(".bat", StringComparison.OrdinalIgnoreCase))
-        {
-            info.FileName = "cmd.exe";
-            info.Arguments = "/c " + Quote(exe) + JoinArgs(_profile.args);
-        }
-        else
-        {
-            info.FileName = exe;
-            info.Arguments = JoinArgs(_profile.args);
-        }
 
         _process = new Process { StartInfo = info, EnableRaisingEvents = true };
         _process.OutputDataReceived += (_, e) => WriteLog(e.Data);
@@ -101,14 +98,16 @@ internal sealed class ExternalProcessRuntime
         {
             var workdir = Resolve(_profile.workdir);
             var exe = Resolve(_profile.exe, workdir);
+            if (exe.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase) ||
+                exe.EndsWith(".bat", StringComparison.OrdinalIgnoreCase) ||
+                exe.EndsWith(".ps1", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("管理器不执行脚本型停止命令；请配置原生 exe。");
+            }
             var stop = new ProcessStartInfo
             {
-                FileName = exe.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase) ||
-                           exe.EndsWith(".bat", StringComparison.OrdinalIgnoreCase) ? "cmd.exe" : exe,
-                Arguments = (exe.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase) ||
-                             exe.EndsWith(".bat", StringComparison.OrdinalIgnoreCase))
-                    ? "/c " + Quote(exe) + JoinArgs(_profile.stopArgs)
-                    : JoinArgs(_profile.stopArgs),
+                FileName = exe,
+                Arguments = JoinArgs(_profile.stopArgs),
                 WorkingDirectory = workdir,
                 UseShellExecute = false,
                 CreateNoWindow = true

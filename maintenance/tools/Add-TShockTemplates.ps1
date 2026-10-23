@@ -119,10 +119,11 @@ Set-Property $config '服务端可执行文件' 'TShock.Server.exe'
 Set-Property $config '运行时母本目录' 'Core'
 Set-Property $config '日志目录' 'Core\Logs'
 Set-Property $config '数据目录' 'Core\Data'
-Set-Property $config '工具目录' 'Tools'
+Set-Property $config '工具目录' ''
 Set-Property $config '顺序启动' $true
 Set-Property $config '看门狗开关' $true
-Set-Property $config '告警开关' $true
+Set-Property $config '告警开关' $false
+Set-Property $config '告警Webhook' ''
 
 [IO.File]::WriteAllText($configPath, ($config | ConvertTo-Json -Depth 12), [Text.UTF8Encoding]::new($false))
 

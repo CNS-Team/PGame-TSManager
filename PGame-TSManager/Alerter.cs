@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace PGameTSManager
@@ -11,20 +13,20 @@ namespace PGameTSManager
     /// <summary>
     /// 告警：把「服务器掉线 / 反复崩溃 / 日志出现致命异常」发到配置里指定的群。
     ///
-    /// Core 不内置任何私人路径与群号：上报脚本和群号全部来自 config.json 的
-    /// alertScript / alertGroupId / alertGroupIds；未配置就等于关闭，发送失败静默处理，
+    /// Core 不内置任何私人地址与群号：Webhook 和群号全部来自 config.json 的
+    /// alertWebhookUrl / alertGroupId / alertGroupIds；未配置就等于关闭，发送失败静默处理，
     /// 绝不影响管理器本身。
     ///
-    /// 脚本契约（外部实现只需满足这个约定）：
-    ///   &lt;script&gt; -Text "&lt;告警正文&gt;" -GroupId &lt;群号&gt;
+    /// 上报由管理器进程内 HttpClient 直接完成，不调用 PowerShell、bat 或 cmd。
     /// </summary>
     internal static class Alerter
     {
         private static readonly object Gate = new();
+        private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
         private static DateTime _lastSentUtc = DateTime.MinValue;
 
         public static bool Enabled { get; set; }
-        public static string ScriptPath { get; set; } = "";
+        public static string WebhookUrl { get; set; } = "";
         public static long GroupId { get; set; }
         public static List<long> GroupIds { get; set; } = new();
         public static int MinIntervalSeconds { get; set; } = 60;
@@ -44,16 +46,25 @@ namespace PGameTSManager
                     ? cfg.alertGroupIds.Where(x => x > 0).Distinct().ToList()
                     : (GroupId > 0 ? new List<long> { GroupId } : new List<long>());
 
-                // 只认配置项；不猜路径、不内置私人脚本位置。
-                ScriptPath = string.IsNullOrWhiteSpace(cfg.alertScript) ? "" : ManagerConfig.Resolve(cfg.alertScript);
+                WebhookUrl = (cfg.alertWebhookUrl ?? "").Trim();
             }
             catch { }
         }
 
-        /// <summary>脚本是否可用（界面/日志里能提示）。</summary>
+        /// <summary>Webhook 是否可用（界面/日志里能提示）。</summary>
         public static bool Ready
         {
-            get { try { return Enabled && !string.IsNullOrWhiteSpace(ScriptPath) && File.Exists(ScriptPath); } catch { return false; } }
+            get
+            {
+                try
+                {
+                    return Enabled &&
+                           !string.IsNullOrWhiteSpace(WebhookUrl) &&
+                           Uri.TryCreate(WebhookUrl, UriKind.Absolute, out var uri) &&
+                           (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+                }
+                catch { return false; }
+            }
         }
 
         /// <summary>
@@ -63,7 +74,7 @@ namespace PGameTSManager
         {
             try
             {
-                if (!Ready) { LastResult = "未启用或找不到上报脚本"; return; }
+                if (!Ready) { LastResult = "未启用或未配置有效告警 Webhook"; return; }
 
                 lock (Gate)
                 {
@@ -84,48 +95,26 @@ namespace PGameTSManager
                     detail
                 });
 
-                var script = ScriptPath;
+                var webhook = WebhookUrl;
                 var groups = GroupIds.Count > 0 ? GroupIds.ToList() : new List<long> { GroupId };
-                Task.Run(() =>
+                Task.Run(async () =>
                 {
                     try
                     {
-                        // 消息里有换行/引号，先落盘再让脚本读，避免命令行转义踩坑
-                        var tmp = Path.Combine(Path.GetTempPath(), "pgtsm_alert_" + Guid.NewGuid().ToString("N") + ".txt");
-                        File.WriteAllText(tmp, text, new UTF8Encoding(false));
-                        try
+                        var payload = JsonSerializer.Serialize(new
                         {
-                            var okCount = 0;
-                            var errors = new List<string>();
-                            foreach (var group in groups)
-                            {
-                                try
-                                {
-                                    var args = "-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"" + script +
-                                               "\" -Text \"" + text.Replace("\"", "'").Replace("\r", "").Replace("\n", "  |  ") +
-                                               "\" -GroupId " + group;
-                                    var psi = new ProcessStartInfo("powershell.exe", args)
-                                    {
-                                        UseShellExecute = false,
-                                        CreateNoWindow = true,
-                                        RedirectStandardOutput = true,
-                                        RedirectStandardError = true
-                                    };
-                                    using var p = Process.Start(psi);
-                                    if (p != null)
-                                    {
-                                        p.WaitForExit(40000);
-                                        if (p.ExitCode == 0) okCount++;
-                                        else errors.Add(group + ":exit " + p.ExitCode);
-                                    }
-                                }
-                                catch (Exception ex) { errors.Add(group + ":" + ex.Message); }
-                            }
-                            LastResult = errors.Count == 0
-                                ? "已发送到 " + okCount + " 个群"
-                                : "部分发送失败：" + string.Join("；", errors);
-                        }
-                        finally { try { File.Delete(tmp); } catch { } }
+                            title,
+                            text,
+                            groups,
+                            source = "PGame-TSManager",
+                            status = "警告",
+                            at = DateTimeOffset.Now
+                        });
+                        using var content = new StringContent(payload, Encoding.UTF8, "application/json");
+                        using var response = await Http.PostAsync(webhook, content).ConfigureAwait(false);
+                        LastResult = response.IsSuccessStatusCode
+                            ? "已通过 Webhook 发送"
+                            : "Webhook 返回 HTTP " + (int)response.StatusCode;
                     }
                     catch (Exception ex) { LastResult = "发送失败：" + ex.Message; }
                 });

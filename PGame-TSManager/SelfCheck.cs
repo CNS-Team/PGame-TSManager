@@ -29,6 +29,29 @@ namespace PGameTSManager
 
             var cfgPath = Path.Combine(AppContext.BaseDirectory, "config.json");
             sb.AppendLine("管理器配置: " + (File.Exists(cfgPath) ? "[正常]" : "[失败：不存在]"));
+            var scriptDependencies = (cfg.externalProcesses ?? new List<ExternalProcessProfile>())
+                .Where(x => x != null && x.enabled)
+                .Select(x => x.exe ?? "")
+                .Where(x => x.EndsWith(".ps1", StringComparison.OrdinalIgnoreCase) ||
+                            x.EndsWith(".bat", StringComparison.OrdinalIgnoreCase) ||
+                            x.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (scriptDependencies.Count > 0)
+            {
+                ok = false;
+                sb.AppendLine("运行期脚本依赖: [失败] " + string.Join(", ", scriptDependencies));
+            }
+            else
+            {
+                sb.AppendLine("运行期脚本依赖: [正常] 仅原生 exe / 进程内 C# 逻辑");
+            }
+            if (cfg.alertEnabled)
+            {
+                var webhookOk = Uri.TryCreate(cfg.alertWebhookUrl, UriKind.Absolute, out var webhook) &&
+                                (webhook.Scheme == Uri.UriSchemeHttp || webhook.Scheme == Uri.UriSchemeHttps);
+                sb.AppendLine("告警 Webhook: " + (webhookOk ? "[正常]" : "[失败：告警已开启但地址无效]"));
+                if (!webhookOk) ok = false;
+            }
 
             var runtime = ManagerConfig.Resolve(cfg.sharedRuntimeDir);
             var exeName = string.IsNullOrWhiteSpace(cfg.serverExecutable) ? "TShock.Server.exe" : cfg.serverExecutable;

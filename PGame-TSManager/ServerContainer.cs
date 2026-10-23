@@ -10,6 +10,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -1198,8 +1199,8 @@ namespace PGameTSManager
                     return;                                   // 已经是真目录，不动它
                 }
 
-                if (RunCmd($"mklink /J \"{link}\" \"{target}\"") && Directory.Exists(link)) return;
-                try { Directory.CreateDirectory(link); } catch { }
+                if (TryCreateDirectoryLink(link, target) && Directory.Exists(link)) return;
+                try { CopyDirectory(target, link); } catch { }
             }
             catch { }
         }
@@ -1226,7 +1227,7 @@ namespace PGameTSManager
                     if (a.Length == b.Length && a.LastWriteTimeUtc == b.LastWriteTimeUtc) return;   // 同 inode（或内容一致）
                     try { File.Delete(link); } catch { return; }                                    // 只删链接，不动母本
                 }
-                if (RunCmd($"mklink /H \"{link}\" \"{target}\"") && File.Exists(link)) return;
+                if (TryCreateHardLink(link, target) && File.Exists(link)) return;
                 try { File.Copy(target, link, true); } catch { }
             }
             catch { }
@@ -1235,22 +1236,39 @@ namespace PGameTSManager
         private static void LinkDirectory(string target, string link)
         {
             if (Directory.Exists(link) || !Directory.Exists(target)) return;
-            if (RunCmd($"mklink /J \"{link}\" \"{target}\"") && Directory.Exists(link)) return;
-            try { File.Copy(target, link, true); } catch { }
+            if (TryCreateDirectoryLink(link, target) && Directory.Exists(link)) return;
+            try { CopyDirectory(target, link); } catch { }
         }
 
-        private static bool RunCmd(string args)
+        [DllImport("Kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern bool CreateHardLink(string fileName, string existingFileName, IntPtr securityAttributes);
+
+        private static bool TryCreateHardLink(string link, string target)
         {
             try
             {
-                var psi = new ProcessStartInfo("cmd.exe", "/c " + args)
-                { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
-                using var pr = Process.Start(psi);
-                if (pr == null) return false;
-                pr.WaitForExit(15000);
-                return pr.ExitCode == 0;
+                return CreateHardLink(link, target, IntPtr.Zero);
             }
             catch { return false; }
+        }
+
+        private static bool TryCreateDirectoryLink(string link, string target)
+        {
+            try
+            {
+                Directory.CreateSymbolicLink(link, target);
+                return true;
+            }
+            catch { return false; }
+        }
+
+        private static void CopyDirectory(string source, string destination)
+        {
+            Directory.CreateDirectory(destination);
+            foreach (var file in Directory.GetFiles(source))
+                File.Copy(file, Path.Combine(destination, Path.GetFileName(file)), true);
+            foreach (var dir in Directory.GetDirectories(source))
+                CopyDirectory(dir, Path.Combine(destination, Path.GetFileName(dir)));
         }
 
         private void Start()

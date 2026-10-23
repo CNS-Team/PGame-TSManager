@@ -64,6 +64,13 @@ namespace PGameTSManager
                 Environment.ExitCode = Cli.DumpConfig();
                 return;
             }
+            var restoreIndex = Array.FindIndex(args, a =>
+                string.Equals(a, "--apply-restore", StringComparison.OrdinalIgnoreCase));
+            if (restoreIndex >= 0)
+            {
+                Environment.ExitCode = ManagerSelfUpdate.Run(args[restoreIndex..]);
+                return;
+            }
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }
 
@@ -1067,7 +1074,7 @@ namespace PGameTSManager
             status.Margin = new Thickness(14, 4, 14, 0);
             Ui.Place(_statusText, 0, 0);
             Ui.Place(_alertText, 0, 1);
-            var brand = Ui.T("流光工作室  ·  Pigeon-X  ·  1.2", 10, UiTheme.TextFaint);
+            var brand = Ui.T("团队：流光工作室  ·  作者：cc004、Pigeon-X  ·  1.2", 10, UiTheme.TextFaint);
             brand.HorizontalAlignment = HorizontalAlignment.Right;
             Ui.Place(brand, 0, 2);
             status.Children.Add(_statusText);
@@ -1517,7 +1524,7 @@ namespace PGameTSManager
             _operationsView.Initialize(Current, Containers);
             AppendLine(Alerter.Ready
                 ? "[告警] 已启用，异常、掉线与自动重启会发送到测试群"
-                : "[告警] 未启用或找不到上报脚本（config.json 的 alertEnabled / alertScript）");
+                : "[告警] 未启用或未配置有效 Webhook（config.json 的 告警开关 / 告警Webhook）");
 
             if (Containers.Count == 0)
             {
@@ -3089,18 +3096,15 @@ namespace PGameTSManager
             {
                 var root = ManagerConfig.BaseDir.TrimEnd('\\');
                 var backup = entry.Path.TrimEnd('\\');
-                var script = "$ErrorActionPreference='Stop'; Start-Sleep -Seconds 4; " +
-                             "Get-Process PGame-TSManager -ErrorAction SilentlyContinue|Stop-Process -Force; " +
-                             "Start-Sleep -Seconds 3; Get-Process TShock.Server -ErrorAction SilentlyContinue|Stop-Process -Force; " +
-                             "Start-Sleep -Seconds 3; Copy-Item -Path '" + backup.Replace("'", "''") +
-                             "\\*' -Destination '" + root.Replace("'", "''") + "' -Recurse -Force; " +
-                             "& schtasks.exe /Run /TN 'AI-PGameTSM-UI'";
-                var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
-                Process.Start(new ProcessStartInfo("powershell.exe",
-                    "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -EncodedCommand " + encoded)
+                var updater = Path.Combine(Path.GetTempPath(),
+                    "PGame-TSManager-updater-" + Guid.NewGuid().ToString("N") + ".exe");
+                File.Copy(Path.Combine(AppContext.BaseDirectory, "PGame-TSManager.exe"), updater, true);
+                Process.Start(new ProcessStartInfo(updater,
+                    "--apply-restore \"" + backup + "\" \"" + root + "\" " + Environment.ProcessId)
                 {
                     UseShellExecute = false,
-                    CreateNoWindow = true
+                    CreateNoWindow = true,
+                    WorkingDirectory = Path.GetTempPath()
                 });
                 Close(true);
                 App.ExitFromTray();

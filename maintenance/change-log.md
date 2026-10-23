@@ -1,5 +1,7 @@
 ﻿# PGame-TSManager 维护日志
 
+- 2026-10-23：统一项目署名为“团队：流光工作室；作者：cc004、Pigeon-X”，补齐程序集元数据、界面页脚、README 与包内说明；公开源码仓库由 CNS-Team 组织维护。
+- 2026-10-23：运行期去脚本化。告警改为进程内 Webhook，外部进程拒绝脚本型入口，沙箱链接改为 Win32/C# 实现，管理器自恢复改为同 exe 临时副本；干净包不包含 `Tools` 维护脚本。
 - 2026-10-23：公开源码仓库迁入 CNS-Team/PGame-TSManager，由 CNS-Team 组织维护、Pigeon-X 负责；同步更新文档与本地打包说明的仓库地址，保留原提交历史与本地构建策略。
 - 2026-10-05：建立 Pigeon-X TSManager 维护仓库；内联 TerrariaServerAPI；建立 TShock 更新、配置中文、REST、插件维护、SSC 和 /help 冻结目录。
 - 2026-10-05：更名 TSManager -> PGame-TSManager（源码目录、解决方案、程序集均为 PGame-TSManager）；命名空间统一为 PGameTSManager；新增 serverProfiles 多服务器映射，直接接管既有服务端目录，不覆盖任何配置；启动前自动备份 server.properties / tshock\config.json / tshock\sscconfig.json。- 2026-10-05：新增 --selfcheck 无界面自检（写 selfcheck.txt，退出码 0/1）；config.json 与相对路径统一以程序目录为基准；本地与远程三个服务器（流光城 / 泰拉大陆 / 流光神域）部署完成并自检通过。

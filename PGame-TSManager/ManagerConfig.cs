@@ -264,12 +264,12 @@ namespace PGameTSManager
         /// <summary>致命日志统计窗口秒数。</summary>
         [JsonProperty("日志报错窗口秒")] public int watchdogLogErrorWindowSeconds = 60;
 
-        // —— 告警：异常/掉线时调用外部上报脚本 ——
-        // Core 不内置私人脚本路径与群号：三项都留空 = 告警关闭。
-        /// <summary>是否启用外部告警。</summary>
+        // —— 告警：异常/掉线时由管理器进程内直接 POST Webhook ——
+        // 不调用 PowerShell、bat 或 cmd；地址与群号留空 = 告警关闭。
+        /// <summary>是否启用告警。</summary>
         [JsonProperty("告警开关")] public bool alertEnabled = false;
-        /// <summary>上报脚本路径（相对可执行文件目录或绝对路径）；留空 = 不告警。</summary>
-        [JsonProperty("告警脚本")] public string alertScript = "";
+        /// <summary>告警 Webhook 地址；留空 = 不告警。</summary>
+        [JsonProperty("告警Webhook")] public string alertWebhookUrl = "";
         /// <summary>兼容旧配置：单个上报群号。</summary>
         [JsonProperty("告警群号_旧")] public long alertGroupId = 0;
         /// <summary>上报到的群号列表；未配置时回退到 alertGroupId。</summary>
@@ -340,7 +340,7 @@ namespace PGameTSManager
             ["watchdogLogErrorThreshold"] = "日志报错阈值",
             ["watchdogLogErrorWindowSeconds"] = "日志报错窗口秒",
             ["alertEnabled"] = "告警开关",
-            ["alertScript"] = "告警脚本",
+            ["alertWebhookUrl"] = "告警Webhook",
             ["alertGroupId"] = "告警群号_旧",
             ["alertGroupIds"] = "告警群号列表",
             ["alertMinIntervalSeconds"] = "告警最小间隔秒"
