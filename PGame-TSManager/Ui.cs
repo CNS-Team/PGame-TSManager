@@ -811,7 +811,6 @@ namespace PGameTSManager
         public static bool StartAllOnLoad { get; set; }
 
         private readonly ManagerConfig _cfg;
-        private readonly ComboBox _serverCombo;
         private readonly ListBox _serverList;
         private readonly ListBox _consoleList;
         private readonly TextBox _commandBox;
@@ -839,11 +838,10 @@ namespace PGameTSManager
         private string _lastAlertResult = "";
         private bool _startingAll;
         private bool _allowClose;
-        private bool _syncingSelection;
 
         public ObservableCollection<ServerContainer> Containers { get; } = new();
         public ServerContainer? Current =>
-            _serverCombo.SelectedItem as ServerContainer ?? _serverList.SelectedItem as ServerContainer;
+            _serverList.SelectedItem as ServerContainer;
 
         public MainWindow()
         {
@@ -862,13 +860,6 @@ namespace PGameTSManager
             ExtendClientAreaTitleBarHeightHint = 0;
             _cfg = ManagerConfig.Instance;
             _cfg.MakeDirectories();
-
-            _serverCombo = Ui.Combo();
-            _serverCombo.Width = 220;
-            _serverCombo.MinWidth = 180;
-            _serverCombo.PlaceholderText = "选择服务器";
-            _serverCombo.ItemTemplate = Ui.Template<ServerContainer>(ServerComboItem);
-            _serverCombo.SelectionChanged += ServerSelectionChanged;
 
             _serverList = new ListBox
             {
@@ -1183,7 +1174,7 @@ namespace PGameTSManager
             Ui.Place(brand, 0, 0);
             header.Children.Add(brand);
 
-            var center = Ui.H(_serverCombo, _consoleNav, _operationsNav);
+            var center = Ui.H(_consoleNav, _operationsNav);
             center.Spacing = 6;
             center.HorizontalAlignment = HorizontalAlignment.Center;
             center.VerticalAlignment = VerticalAlignment.Center;
@@ -1314,33 +1305,6 @@ namespace PGameTSManager
             catch { return null; }
         }
 
-        private static Control ServerComboItem(ServerContainer c)
-        {
-            var dot = new Border
-            {
-                Width = 8,
-                Height = 8,
-                CornerRadius = new CornerRadius(4),
-                Margin = new Thickness(0, 0, 8, 0),
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            dot.Bind(Border.BackgroundProperty, new Binding(nameof(ServerContainer.StatusBrush)));
-            var label = Ui.T("", 12.5);
-            label.Bind(TextBlock.TextProperty, new Binding(nameof(ServerContainer.ListLabel)));
-            var status = Ui.T("", 10.5, UiTheme.TextDim);
-            status.Bind(TextBlock.TextProperty, new Binding(nameof(ServerContainer.StatusText)));
-            status.Bind(TextBlock.ForegroundProperty, new Binding(nameof(ServerContainer.StatusBrush)));
-            var row = Ui.Grid("Auto", "Auto,*,Auto");
-            Ui.Place(dot, 0, 0);
-            Ui.Place(label, 0, 1);
-            Ui.Place(status, 0, 2);
-            label.Margin = new Thickness(0, 0, 8, 0);
-            row.Children.Add(dot);
-            row.Children.Add(label);
-            row.Children.Add(status);
-            return row;
-        }
-
         private static Control ServerSidebarItem(ServerContainer c)
         {
             var dot = new Border
@@ -1370,11 +1334,11 @@ namespace PGameTSManager
             var card = Ui.Card(row, 8, UiTheme.SurfaceRaised);
             var selection = new Border
             {
-                Child = card,
                 BorderBrush = UiTheme.Accent,
                 BorderThickness = new Thickness(2),
                 CornerRadius = new CornerRadius(9),
-                IsVisible = false
+                IsVisible = false,
+                IsHitTestVisible = false
             };
             selection.Bind(Border.IsVisibleProperty, new Binding
             {
@@ -1385,7 +1349,8 @@ namespace PGameTSManager
                     AncestorLevel = 1
                 }
             });
-            return selection;
+            var host = new Grid { Children = { card, selection } };
+            return host;
         }
 
         private async void OnOpened(object? sender, EventArgs e)
@@ -1493,7 +1458,6 @@ namespace PGameTSManager
             {
                 var selected = Containers.FirstOrDefault(c =>
                     string.Equals(c.StableId, selectedId, StringComparison.OrdinalIgnoreCase)) ?? Containers[0];
-                _serverCombo.SelectedItem = selected;
                 _serverList.SelectedItem = selected;
             }
             _operationsView.SetContext(Current, Containers);
@@ -1502,21 +1466,8 @@ namespace PGameTSManager
             UpdateServerCount();
         }
 
-        private void ServerSelectionChanged(object? sender, SelectionChangedEventArgs e)
-        {
-            if (_syncingSelection) return;
-            _syncingSelection = true;
-            _serverList.SelectedItem = _serverCombo.SelectedItem;
-            _syncingSelection = false;
-            SetCurrent(_serverCombo.SelectedItem as ServerContainer);
-        }
-
         private void ServerListSelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
-            if (_syncingSelection) return;
-            _syncingSelection = true;
-            _serverCombo.SelectedItem = _serverList.SelectedItem;
-            _syncingSelection = false;
             SetCurrent(_serverList.SelectedItem as ServerContainer);
         }
 
