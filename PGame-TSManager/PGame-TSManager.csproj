@@ -4,28 +4,32 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
-    <UseWPF>true</UseWPF>
-    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>false</UseWPF>
+    <UseWindowsForms>false</UseWindowsForms>
     <AssemblyName>PGame-TSManager</AssemblyName>
     <RootNamespace>PGameTSManager</RootNamespace>
     <AssemblyTitle>PGame-TSManager</AssemblyTitle>
     <Product>PGame-TSManager</Product>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <ApplicationIcon>PGame-TSManager.ico</ApplicationIcon>
     <SatelliteResourceLanguages>zh-Hans</SatelliteResourceLanguages>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="System.Management" Version="9.0.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="PGame-TSManager.ico" />
-    <Resource Include="PGame-TSManager-logo.png" />
-        <None Update="Data\*">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </None>
+    <AvaloniaResource Include="PGame-TSManager.ico" />
+    <AvaloniaResource Include="PGame-TSManager-logo.png" />
+    <None Update="Data\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="Plugins\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

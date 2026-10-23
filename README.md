@@ -9,6 +9,7 @@
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D4" alt="Windows 10/11">
   <img src="https://img.shields.io/badge/TShock-6.2.x-4B8BBE" alt="TShock 6.2.x">
   <img src="https://img.shields.io/badge/.NET-9.0-512BD4" alt=".NET 9">
+  <img src="https://img.shields.io/badge/UI-Avalonia%2011.3-8A2BE2" alt="Avalonia 11.3">
 </p>
 
 <p align="center">
@@ -61,6 +62,15 @@ PGame-TSManager 用一个窗口管理多个 TShock 服务端。它负责：
 - 自检、维护工具，以及一键本地打包脚本（`maintenance\tools\Build-Local.ps1`；流水线已迁出 GitHub）
 
 它不替代 TShock 本身，也不会把世界、数据库、日志或玩家数据提交到 Git。
+
+## UI 技术栈
+
+界面已从 WPF 全量迁移到 **Avalonia UI 11.3**，运行时仍只面向 Windows（WMI、子进程、托盘和单实例互斥都依赖 Windows）。
+
+- 所有应用启动、主题、主窗口、运维中心、设置页和对话框都集中在 `PGame-TSManager\Ui.cs`。
+- 仓库不再包含 `.xaml` 或 `*.xaml.cs`；`UseWPF` 与 `UseWindowsForms` 均为 `false`。
+- 控制台保留 ANSI 真彩色和 Terraria `[c/RRGGBB:文字]` 的分段着色。
+- 发布方式仍是本地自包含单文件，不依赖目标机器预装 Avalonia 或 .NET。
 
 ## 四个目录
 
@@ -184,7 +194,7 @@ PGame-TSManager.exe --selfcheck
 | 看门狗 | 异常退出自动重启，连续失败后停止并告警 |
 | 内存压缩 | 空服时压缩工作集，不关闭端口、不中断首次进入 |
 | 单实例 | 重复双击 exe 只唤醒已有管理器，不创建第二个窗口 |
-| 自定义标题栏 | PGame-TSManager 标题、圆角 Logo、居中窗口按钮 |
+| 自定义标题栏 | 左侧红黄绿三点、居中标题、右侧最小化/最大化/关闭；支持拖动与双击最大化 |
 
 ## 常用命令
 

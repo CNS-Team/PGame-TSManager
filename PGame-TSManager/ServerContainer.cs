@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -10,14 +11,40 @@ using System.Net.NetworkInformation;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Documents;
-using System.Windows.Media;
+using Avalonia.Media;
+using Avalonia.Threading;
 using Newtonsoft.Json;
 using PGameTSManager.Annotations;
 
 namespace PGameTSManager
 {
+    public sealed record ConsoleRun(string Text, IBrush Brush);
+
+    /// <summary>
+    /// 控制台一行。保留分段颜色，界面层用 TextBlock.Inlines 渲染；
+    /// 旧调用方仍可用 (text, brush) 构造单色行。
+    /// </summary>
+    public sealed class ConsoleEntry
+    {
+        public ConsoleEntry(string text, IBrush brush)
+        {
+            Text = text;
+            Brush = brush;
+            Runs = new[] { new ConsoleRun(text, brush) };
+        }
+
+        public ConsoleEntry(IReadOnlyList<ConsoleRun> runs)
+        {
+            Runs = runs;
+            Text = string.Concat(runs.Select(run => run.Text));
+            Brush = runs.Count > 0 ? runs[runs.Count - 1].Brush : UiTheme.LogNormal;
+        }
+
+        public string Text { get; }
+        public IBrush Brush { get; }
+        public IReadOnlyList<ConsoleRun> Runs { get; }
+    }
+
     internal sealed class WorldBuildPlan
     {
         public int AutoCreate { get; init; }
@@ -64,7 +91,6 @@ namespace PGameTSManager
 
         private readonly ManagerConfig _managerConfig;
         private readonly ServerProfile _profile;
-        private readonly Paragraph _para;
         private Process? _process;
         private StreamWriter? _stdin;
 
@@ -123,7 +149,7 @@ namespace PGameTSManager
             }
         }
 
-        public FlowDocument Document { get; init; }
+        public ObservableCollection<ConsoleEntry> ConsoleLines { get; } = new();
         public event Action<ServerContainer>? OnTextChanged;
         private string _title;
 
@@ -133,20 +159,17 @@ namespace PGameTSManager
             private set { _title = value; OnPropertyChanged(nameof(Title)); }
         }
 
-        // 配色由 App.ApplyTheme() 注入（跟随 TShock 控制台色 + 系统深浅色）
-        private static Brush Res(string key, Color fallback)
-            => (Application.Current?.TryFindResource(key) as Brush) ?? new SolidColorBrush(fallback);
-        private static Brush ClrNormal => Res("LogNormal", Color.FromRgb(0xD6, 0xD6, 0xD6));
-        private static Brush ClrDim    => Res("TextDim",   Color.FromRgb(0x8A, 0x8A, 0x8A));
-        private static Brush ClrGood   => Res("LogOk",     Color.FromRgb(0x66, 0xBB, 0x6A));
-        private static Brush ClrWarn   => Res("LogWarn",   Color.FromRgb(0xFF, 0xB7, 0x4D));
-        private static Brush ClrError  => Res("LogError",  Color.FromRgb(0xFF, 0x52, 0x52));
-        private static Brush ClrAccent => Res("LogCmd",    Color.FromRgb(0x4F, 0xC3, 0xF7));
-        private static Brush ClrPlugin => Res("LogPlugin", Color.FromRgb(0x8B, 0x5C, 0xF6));
-        private static Brush ClrInfo   => Res("LogInfo",   Color.FromRgb(0x4F, 0xC3, 0xF7));
-        private static Brush ClrCmd    => Res("LogCmd",    Color.FromRgb(0x4C, 0x8D, 0xF6));
+        private static IBrush ClrNormal => UiTheme.LogNormal;
+        private static IBrush ClrDim => UiTheme.TextDim;
+        private static IBrush ClrGood => UiTheme.LogOk;
+        private static IBrush ClrWarn => UiTheme.LogWarn;
+        private static IBrush ClrError => UiTheme.LogError;
+        private static IBrush ClrAccent => UiTheme.LogCmd;
+        private static IBrush ClrPlugin => UiTheme.LogPlugin;
+        private static IBrush ClrInfo => UiTheme.LogInfo;
+        private static IBrush ClrCmd => UiTheme.LogCmd;
 
-        public Brush StatusBrush => IsRunning ? ClrGood : ClrDim;
+        public IBrush StatusBrush => IsRunning ? ClrGood : ClrDim;
 
         private int _playerCount = -1;
         private int _maxPlayers;
@@ -379,9 +402,6 @@ namespace PGameTSManager
             catch { try { process.Kill(); } catch { } }
         }
 
-        public Brush Foreground { get; private set; }
-        public Brush Background { get; private set; }
-
         /// <summary>该服的配置目录（1.PigeonServers\&lt;序号.名字&gt;）。</summary>
         public string ProfileDirectory => ServerDirectory;
         /// <summary>下拉框显示用：带序号，例如 "1. 生存"（序号来自服务器目录名；0.xxx 也保留 "0. "）。</summary>
@@ -412,10 +432,6 @@ namespace PGameTSManager
         {
             _managerConfig = config;
             _profile = profile;
-            _para = new Paragraph();
-            Document = new FlowDocument(_para);
-            Foreground = new SolidColorBrush(Colors.LightGray);
-            Background = new SolidColorBrush(Colors.Black);
             _title = Name;
         }
 
@@ -1170,7 +1186,7 @@ namespace PGameTSManager
 
         private void StartCore()
         {
-            _para.Inlines.Clear();
+            ConsoleLines.Clear();
 
             var manifest = _profile.LoadManifest()
                 ?? throw new FileNotFoundException($"找不到该服的 config.json：{Path.Combine(ServerDirectory, ServerProfile.ManifestFileName)}");
@@ -1314,9 +1330,7 @@ namespace PGameTSManager
                 {
                     try
                     {
-                        var dispatcher = _para.Dispatcher;
-                        if (dispatcher == null) return;
-                        dispatcher.BeginInvoke(new Action(() =>
+                        Dispatcher.UIThread.Post(() =>
                         {
                             try
                             {
@@ -1329,7 +1343,7 @@ namespace PGameTSManager
                                 finally { _watchdogRestarting = false; }
                             }
                             catch (Exception ex) { AddText("[看门狗] 重启失败：" + ex.Message + "\n"); }
-                        }));
+                        });
                     }
                     catch { }
                 });
@@ -1777,7 +1791,7 @@ namespace PGameTSManager
         ///   TShock 标准输出=金色  Server API/提示=青  插件标签=紫
         ///   错误=红  警告=琥珀  成功/状态=绿  管理器/指令=蓝  列表/次要=灰
         /// </summary>
-        private static Brush ColorFor(string line)
+        private static IBrush ColorFor(string line)
         {
             var s = line.TrimStart();
             if (s.Length == 0) return ClrNormal;
@@ -1851,9 +1865,7 @@ namespace PGameTSManager
         private void AddText(string text, bool isError = false)
         {
             if (string.IsNullOrEmpty(text)) return;
-            var dispatcher = _para.Dispatcher;
-            if (dispatcher == null) return;
-            try { dispatcher.BeginInvoke(new Action(() => AppendText(text, isError))); } catch { }
+            try { Dispatcher.UIThread.Post(() => AppendText(text, isError)); } catch { }
         }
 
         /// <summary>
@@ -1876,9 +1888,9 @@ namespace PGameTSManager
         private static readonly System.Text.RegularExpressions.Regex AnsiColorRx =
             new(@"\x1B\[([0-9;]*)m", System.Text.RegularExpressions.RegexOptions.Compiled);
 
-        private static readonly Dictionary<string, Brush> ColorBrushCache = new();
+        private static readonly Dictionary<string, IBrush> ColorBrushCache = new();
 
-        private static Brush BrushOfRgb(string hex, Brush fallback)
+        private static IBrush BrushOfRgb(string hex, IBrush fallback)
         {
             lock (ColorBrushCache)
             {
@@ -1889,7 +1901,6 @@ namespace PGameTSManager
                     var g = Convert.ToByte(hex.Substring(2, 2), 16);
                     var b = Convert.ToByte(hex.Substring(4, 2), 16);
                     var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
-                    brush.Freeze();
                     ColorBrushCache[hex] = brush;
                     return brush;
                 }
@@ -1897,63 +1908,67 @@ namespace PGameTSManager
             }
         }
 
-        /// <summary>把一行渲染进面板：带 [c/RRGGBB:...] 的按真实颜色拆成多段，否则按关键字着色。</summary>
+        /// <summary>把一行渲染进面板：ANSI 与 [c/RRGGBB:...] 都拆成真实颜色分段，其它行按关键字着色。</summary>
         private void AppendLine(string raw, bool isError = false)
         {
-            if (AnsiColorRx.IsMatch(raw))
-            {
-                AppendAnsiLine(raw, isError);
-                return;
-            }
-
-            if (!ColorTagRx.IsMatch(raw))
-            {
-                _para.Inlines.Add(new Run(raw + "\n") { Foreground = isError ? ClrError : ColorFor(raw) });
-                return;
-            }
-
-            var fallback = isError ? ClrError : ColorFor(raw);
-            var idx = 0;
-            foreach (System.Text.RegularExpressions.Match m in ColorTagRx.Matches(raw))
-            {
-                if (m.Index > idx)
-                    _para.Inlines.Add(new Run(raw.Substring(idx, m.Index - idx)) { Foreground = fallback });
-                _para.Inlines.Add(new Run(m.Groups[2].Value) { Foreground = BrushOfRgb(m.Groups[1].Value, fallback) });
-                idx = m.Index + m.Length;
-            }
-            if (idx < raw.Length)
-                _para.Inlines.Add(new Run(raw.Substring(idx)) { Foreground = fallback });
-            _para.Inlines.Add(new Run("\n") { Foreground = fallback });
+            var runs = ParseConsoleRuns(raw, isError);
+            if (runs.Count > 0) ConsoleLines.Add(new ConsoleEntry(runs));
         }
 
-        /// <summary>解析插件写出的 ANSI 真彩色，避免 TSM 控制台直接显示 [38;2;...m 这种乱码。</summary>
-        private void AppendAnsiLine(string raw, bool isError)
+        private List<ConsoleRun> ParseConsoleRuns(string raw, bool isError)
         {
-            var plain = AnsiColorRx.Replace(raw, "");
+            var plain = AnsiColorRx.Replace(ColorTagRx.Replace(raw, "$2"), "");
             var fallback = isError ? ClrError : ColorFor(plain);
+            var runs = new List<ConsoleRun>();
             var current = fallback;
             var idx = 0;
 
-            foreach (System.Text.RegularExpressions.Match m in AnsiColorRx.Matches(raw))
+            while (idx < raw.Length)
             {
-                if (m.Index > idx)
+                var ansi = AnsiColorRx.Match(raw, idx);
+                if (ansi.Success && ansi.Index == idx)
                 {
-                    _para.Inlines.Add(new Run(raw.Substring(idx, m.Index - idx)) { Foreground = current });
+                    current = BrushOfAnsiCode(ansi.Groups[1].Value, fallback);
+                    idx += ansi.Length;
+                    continue;
                 }
 
-                current = BrushOfAnsiCode(m.Groups[1].Value, fallback);
-                idx = m.Index + m.Length;
+                var tag = ColorTagRx.Match(raw, idx);
+                if (tag.Success && tag.Index == idx)
+                {
+                    var tagBrush = BrushOfRgb(tag.Groups[1].Value, current);
+                    AddConsoleRun(runs, tag.Groups[2].Value, tagBrush);
+                    current = tagBrush;
+                    idx += tag.Length;
+                    continue;
+                }
+
+                var next = raw.Length;
+                var nextAnsi = AnsiColorRx.Match(raw, idx);
+                if (nextAnsi.Success) next = Math.Min(next, nextAnsi.Index);
+                var nextTag = ColorTagRx.Match(raw, idx);
+                if (nextTag.Success) next = Math.Min(next, nextTag.Index);
+
+                AddConsoleRun(runs, raw.Substring(idx, next - idx), current);
+                idx = next;
             }
 
-            if (idx < raw.Length)
-            {
-                _para.Inlines.Add(new Run(raw.Substring(idx)) { Foreground = current });
-            }
-
-            _para.Inlines.Add(new Run("\n") { Foreground = current });
+            return runs;
         }
 
-        private static Brush BrushOfAnsiCode(string code, Brush fallback)
+        private static void AddConsoleRun(List<ConsoleRun> runs, string text, IBrush brush)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            if (runs.Count > 0 && ReferenceEquals(runs[runs.Count - 1].Brush, brush))
+            {
+                var previous = runs[runs.Count - 1];
+                runs[runs.Count - 1] = previous with { Text = previous.Text + text };
+                return;
+            }
+            runs.Add(new ConsoleRun(text, brush));
+        }
+
+        private static IBrush BrushOfAnsiCode(string code, IBrush fallback)
         {
             if (string.IsNullOrWhiteSpace(code) || code == "0") return fallback;
 
@@ -2025,11 +2040,7 @@ namespace PGameTSManager
                 }
                 WriteToFile(text);          // ★ 同时落盘，方便事后查（Logs\<服>-日期.log）
 
-                while (_para.Inlines.Count > 4096)
-                {
-                    if (_para.Inlines.FirstInline == null) break;
-                    _para.Inlines.Remove(_para.Inlines.FirstInline);
-                }
+                while (ConsoleLines.Count > 4096) ConsoleLines.RemoveAt(0);
                 OnTextChanged?.Invoke(this);
             }
             catch { }

@@ -9,6 +9,12 @@
 
 **PGame-TSManager 是 TShock 多进程控制面，不是业务层。**
 
+### UI 栈
+
+- 桌面 UI 使用 Avalonia UI 11.3，目标框架为 `net9.0-windows`。
+- 所有 UI 启动、主题、窗口、对话框和页面集中在 `PGame-TSManager\Ui.cs`。
+- 不再使用 WPF、WinForms 或 XAML；迁移口径见 `docs\UI技术栈-Avalonia全量迁移.md`。
+
 ### TSM 负责
 
 - TShock 进程启动 / 停止 / 重启 / 顺序启动

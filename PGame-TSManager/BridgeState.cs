@@ -39,7 +39,7 @@ namespace PGameTSManager
         private static readonly object Gate = new();
 
         /// <summary>处理一批桥接事件：更新状态 + 按规则转发到 ControlEventHub（避免 SSE 刷屏）。</summary>
-        public static int Ingest(string serverId, JArray events)
+        public static int Ingest(string serverId, JArray? events)
         {
             if (events == null || events.Count == 0) return 0;
             var n = 0;

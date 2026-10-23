@@ -8,6 +8,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -185,7 +186,7 @@ internal sealed class ControlApiServer : IDisposable
             return;
         }
 
-        var data = await window.Dispatcher.InvokeAsync(() =>
+        var data = await Dispatcher.UIThread.InvokeAsync(() =>
         {
             var running = window.Containers.Count(c => c.IsRunning);
             return new
@@ -201,7 +202,7 @@ internal sealed class ControlApiServer : IDisposable
                 eventEpoch = ControlEventHub.EventEpoch,
                 at = DateTimeOffset.Now.ToString("o")
             };
-        }).Task;
+        });
         await WriteJsonAsync(ctx, 200, data);
     }
 
@@ -214,7 +215,7 @@ internal sealed class ControlApiServer : IDisposable
             return;
         }
 
-        var data = await window.Dispatcher.InvokeAsync(() =>
+        var data = await Dispatcher.UIThread.InvokeAsync(() =>
             window.Containers.Select(c => new
             {
                 id = c.StableId,
@@ -229,7 +230,7 @@ internal sealed class ControlApiServer : IDisposable
                 rebuilding = c.IsRebuilding,
                 at = DateTimeOffset.Now.ToString("o")
             }).ToList()
-        ).Task;
+        );
         await WriteJsonAsync(ctx, 200, new { ok = true, contractVersion = "tsm.control.v1", servers = data });
     }
 
@@ -242,7 +243,7 @@ internal sealed class ControlApiServer : IDisposable
         var window = _windowFactory();
         if (window == null) { await WriteJsonAsync(ctx, 503, new { ok = false, error = "manager_not_ready" }); return; }
 
-        var container = await window.Dispatcher.InvokeAsync(() => window.FindContainer(id)).Task;
+        var container = await Dispatcher.UIThread.InvokeAsync(() => window.FindContainer(id));
         if (container == null) { await WriteJsonAsync(ctx, 404, new { ok = false, error = "server_not_found", id }); return; }
 
         if (action == "command")
@@ -261,13 +262,13 @@ internal sealed class ControlApiServer : IDisposable
 
         if (action == "start")
         {
-            await window.Dispatcher.InvokeAsync(() => { if (!container.IsRunning) container.IsRunning = true; }).Task;
+            await Dispatcher.UIThread.InvokeAsync(() => { if (!container.IsRunning) container.IsRunning = true; });
             await WriteJsonAsync(ctx, 202, new { ok = true, id, state = "starting" });
             return;
         }
         if (action == "stop")
         {
-            await window.Dispatcher.InvokeAsync(() => { if (container.IsRunning) container.IsRunning = false; }).Task;
+            await Dispatcher.UIThread.InvokeAsync(() => { if (container.IsRunning) container.IsRunning = false; });
             await WriteJsonAsync(ctx, 202, new { ok = true, id, state = "stopping" });
             return;
         }
@@ -275,9 +276,9 @@ internal sealed class ControlApiServer : IDisposable
         {
             _ = Task.Run(async () =>
             {
-                await window.Dispatcher.InvokeAsync(() => { if (container.IsRunning) container.IsRunning = false; });
+                await Dispatcher.UIThread.InvokeAsync(() => { if (container.IsRunning) container.IsRunning = false; });
                 await container.WaitForStoppedAsync(TimeSpan.FromSeconds(30));
-                await window.Dispatcher.InvokeAsync(() => { if (!container.IsRunning) container.IsRunning = true; });
+                await Dispatcher.UIThread.InvokeAsync(() => { if (!container.IsRunning) container.IsRunning = true; });
             });
             await WriteJsonAsync(ctx, 202, new { ok = true, id, state = "restarting" });
             return;
@@ -287,7 +288,7 @@ internal sealed class ControlApiServer : IDisposable
             // 把插件总库同步进运行沙箱（文件不被锁）；调用方随后可 /hr load 热升级。
             try
             {
-                var summary = await window.Dispatcher.InvokeAsync(() => container.SyncPluginsNow()).Task;
+                var summary = await Dispatcher.UIThread.InvokeAsync(() => container.SyncPluginsNow());
                 await WriteJsonAsync(ctx, 200, new { ok = true, id, summary });
             }
             catch (Exception ex)
@@ -394,14 +395,14 @@ internal sealed class ControlApiServer : IDisposable
 
         var window = _windowFactory();
         if (window == null) { await WriteJsonAsync(ctx, 503, new { ok = false, error = "manager_not_ready" }); return; }
-        var container = await window.Dispatcher.InvokeAsync(() => window.FindContainer(id)).Task;
+        var container = await Dispatcher.UIThread.InvokeAsync(() => window.FindContainer(id));
         if (container == null) { await WriteJsonAsync(ctx, 404, new { ok = false, error = "server_not_found", id }); return; }
 
         if (dryRun)
         {
             try
             {
-                var preview = await window.Dispatcher.InvokeAsync(() => container.PreviewRebuild(requestId, actor)).Task;
+                var preview = await Dispatcher.UIThread.InvokeAsync(() => container.PreviewRebuild(requestId, actor));
                 await WriteJsonAsync(ctx, 200, new
                 {
                     ok = true,
@@ -439,8 +440,8 @@ internal sealed class ControlApiServer : IDisposable
         {
             try
             {
-                var op = window.Dispatcher.InvokeAsync(() => container.RebuildWorldAsync(requestId, actor));
-                await op.Task.Unwrap();
+                await Dispatcher.UIThread.InvokeAsync(
+                    () => container.RebuildWorldAsync(requestId, actor));
             }
             catch (Exception ex)
             {
